@@ -27,15 +27,13 @@ jobs:
           echo "${{ secrets.GOOGLE_CREDS }}" > google-creds.json
 
       - name: Run all script
-  run: |
-    echo "Esecuzione scraping_eventifvg.py"
-    python scraping_eventifvg.py
+        run: |
+          echo "Esecuzione scraping_eventifvg.py"
+          python scraping_eventifvg.py
+          echo "Esecuzione scraping_itinerarinellarte.py"
+          python scraping_itinerarinellarte.py
+          echo "Esecuzione scraping_turismofvg.py"
+          python scraping_turismofvg.py
+          echo "Esecuzione unione_dati_scraping.py"
+          python unione_dati_scraping.py
 
-    echo "Esecuzione scraping_itinerarinellarte.py"
-    python scraping_itinerarinellarte.py
-
-    echo "Esecuzione scraping_turismofvg.py"
-    python scraping_turismofvg.py
-
-    echo "Esecuzione unione_dati_scraping.py"
-    python unione_dati_scraping.py

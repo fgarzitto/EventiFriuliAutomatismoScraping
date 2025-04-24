@@ -1,0 +1,8 @@
+beautifulsoup4
+requests
+gspread
+oauth2client
+dateparser
+
+
+
