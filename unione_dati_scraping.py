@@ -1,81 +1,15 @@
 import os
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import time
-import dateparser
-import logging
+import pandas as pd
+from datetime import datetime
 
-# Configura il logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# URL di partenza
-url = 'https://www.eventifvg.it/'
-
-def estrai_eventi(soup):
-    eventi = []
-
-    # Trova tutti gli eventi nella pagina
-    for evento in soup.find_all('div', class_='tribe-common-g-row tribe-events-calendar-list__event-row'):
-        # Estrazione del titolo
-        titolo_elem = evento.find('h3', class_='tribe-events-calendar-list__event-title')
-        if titolo_elem:
-            link_elem = titolo_elem.find('a', class_='tribe-events-calendar-list__event-title-link')
-            titolo = link_elem.text.strip() if link_elem else 'Titolo non disponibile'
-            link = link_elem['href'] if link_elem and link_elem.has_attr('href') else 'Link non disponibile'
-        else:
-            titolo = 'Titolo non disponibile'
-            link = 'Link non disponibile'
-
-        # Estrazione della data
-        data_elem = evento.find('time', class_='tribe-events-calendar-list__event-date-tag-datetime')
-        if data_elem and data_elem.has_attr('datetime'):
-            data_raw = data_elem['datetime']
-            data = datetime.strptime(data_raw, '%Y-%m-%d').strftime('%d %b').upper()
-        else:
-            data = 'Data non disponibile'
-
-        # Estrazione dell'orario di inizio
-        orario_elem = evento.find('time', class_='tribe-events-calendar-list__event-datetime')
-        if orario_elem:
-            orario_start_elem = orario_elem.find('span', class_='tribe-event-date-start')
-            orario = orario_start_elem.text.split('@')[-1].strip() if orario_start_elem else 'Orario non disponibile'
-        else:
-            orario = 'Orario non disponibile'
-
-        # Estrazione del luogo
-        luogo_elem = evento.find('address', class_='tribe-events-calendar-list__event-venue')
-        if luogo_elem:
-            luogo_title_elem = luogo_elem.find('span', class_='tribe-events-calendar-list__event-venue-title')
-            luogo = luogo_title_elem.text.strip() if luogo_title_elem else 'Luogo non disponibile'
-        else:
-            luogo = 'Luogo non disponibile'
-
-        # La categoria non è specificata, quindi la lasciamo vuota
-        categoria = ''
-
-        evento_data = {
-            'titolo': titolo,
-            'data': data,
-            'orario': orario,
-            'luogo': luogo,
-            'link': link,
-            'categoria': categoria,
-        }
-
-        logging.info(f"Evento trovato: {evento_data}")
-        eventi.append(evento_data)
-
-    return eventi
-
-def main():
+def unisci_e_ordina_eventi():
     try:
         # Autenticazione tramite variabili d'ambiente
         client_email = os.getenv("GSHEET_CLIENT_EMAIL")
         private_key = os.getenv("GSHEET_PRIVATE_KEY")
-
+        
         credentials_info = {
             "type": "service_account",
             "project_id": "EventiFriuli",
@@ -93,75 +27,33 @@ def main():
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
         client = gspread.authorize(credentials)
 
-        # Apertura del foglio Google Sheets
-        sheet = client.open("Eventi in Friuli").worksheet("Foglio2")
-        logging.info("Foglio aperto con successo: %s", sheet.title)
+        # Apertura del Google Sheet
+        spreadsheet = client.open("Eventi in Friuli")  # Nome del Google Sheet
+        all_sheets = spreadsheet.worksheets()
+
+        # Lettura di tutti i dati dai fogli (escluso il primo)
+        all_data = []
+        for sheet in all_sheets[1:]:  # Salta il primo tab
+            records = sheet.get_all_records()
+            all_data.extend(records)
+
+        # Conversione dei dati in un DataFrame Pandas
+        df = pd.DataFrame(all_data)
+
+        # Assicurarsi che la colonna 'data' sia in formato datetime
+        if 'data' in df.columns:
+            df['data'] = pd.to_datetime(df['data'], format='%d %b', errors='coerce')
+            df = df.sort_values(by='data')  # Ordina per data
+
+        # Scrittura nel primo tab
+        first_sheet = all_sheets[0]
+        first_sheet.clear()  # Cancella tutti i dati esistenti
+        first_sheet.update([df.columns.values.tolist()] + df.fillna('').values.tolist())  # Aggiorna con nuovi dati
+
+        print("Dati copiati e ordinati con successo nel primo tab!")
+
     except Exception as e:
-        logging.error(f"Errore nell'accesso a Google Sheets: {e}")
-        return
-
-    try:
-        # Verifica e cancella righe esistenti
-        num_rows = len(sheet.get_all_values())
-        if num_rows > 1:
-            sheet.delete_rows(2, num_rows)
-            logging.info("Righe cancellate con successo.")
-    except Exception as e:
-        logging.error(f"Errore nella cancellazione delle righe: {e}")
-        return
-
-    eventi_totali = []
-    url_da_scrapare = url
-    data_corrente = datetime.now()
-    data_limite = data_corrente + timedelta(days=7)
-
-    while url_da_scrapare:
-        logging.info(f"Scraping URL: {url_da_scrapare}")
-
-        try:
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            response = requests.get(url_da_scrapare, headers=headers)
-            response.raise_for_status()
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Errore nella richiesta dell'URL {url_da_scrapare}: {e}")
-            break
-
-        soup = BeautifulSoup(response.content, 'html.parser')
-        eventi_pagina = estrai_eventi(soup)
-        
-        if not eventi_pagina:
-            logging.info("Nessun evento trovato nella pagina.")
-            break
-
-        for evento in eventi_pagina:
-            try:
-                data_evento = datetime.strptime(evento['data'], '%d %b')
-                data_evento = data_evento.replace(year=data_corrente.year)
-                if data_evento > data_limite:
-                    logging.info(f"Raggiunta la data limite: {data_evento}. Interrompiamo lo scraping.")
-                    url_da_scrapare = None
-                    break
-            except ValueError:
-                logging.warning(f"Impossibile analizzare la data dell'evento: {evento['data']}")
-                continue
-
-            eventi_totali.append(evento)
-
-        next_page_elem = soup.find('a', class_='tribe-events-c-nav__next')
-        url_da_scrapare = next_page_elem['href'] if next_page_elem and next_page_elem.has_attr('href') else None
-
-        time.sleep(2)
-
-    if eventi_totali:
-        eventi_to_append = [[e['titolo'], e['data'], e['orario'], e['luogo'], e['link'], e['categoria']] for e in eventi_totali]
-        logging.info(f"Dati da caricare su Google Sheets: {eventi_to_append}")
-        try:
-            sheet.append_rows(eventi_to_append)
-            logging.info("Dati caricati su Google Sheets")
-        except Exception as e:
-            logging.error(f"Errore nel caricamento su Google Sheets: {e}")
-    else:
-        logging.info("Nessun evento da caricare su Google Sheets.")
+        print(f"Errore: {e}")
 
 if __name__ == "__main__":
-    main()
+    unisci_e_ordina_eventi()
