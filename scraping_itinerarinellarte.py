@@ -10,13 +10,6 @@ import logging
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Nome del file delle credenziali (allineato con il workflow GitHub Actions)
-credentials_path = 'google-creds.json'
-
-# Controlla se il file delle credenziali esiste
-if not os.path.exists(credentials_path):
-    raise FileNotFoundError(f"Il file '{credentials_path}' non è stato trovato nella directory corrente: {os.getcwd()}")
-
 # URL di partenza
 url = 'https://www.itinerarinellarte.it/it/mostre/friuli-venezia-giulia'
 
@@ -75,10 +68,30 @@ def estrai_eventi(soup):
 
 def main():
     try:
+        # Legge i segreti dall'ambiente
+        client_email = os.getenv("GSHEET_CLIENT_EMAIL")
+        private_key = os.getenv("GSHEET_PRIVATE_KEY")
+
+        # Configura manualmente il dizionario delle credenziali
+        credentials_info = {
+            "type": "service_account",
+            "project_id": "EventiFriuli",  # Sostituisci con l'ID del tuo progetto
+            "private_key_id": "2ad6e92ed5bd78ebb61505057bc75ecb4130b6a6",  # Sostituisci con l'ID della chiave privata
+            "private_key": private_key,
+            "client_email": client_email,
+            "client_id": "103136377669455790448",  # Sostituisci con l'ID del client
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email}"
+        }
+
         # Autenticazione con Google Sheets
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
-        client = gspread.authorize(creds)
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
+        client = gspread.authorize(credentials)
+
+        # Apertura del foglio "Eventi in Friuli" e selezione del foglio "Itinerarinellarte"
         sheet = client.open("Eventi in Friuli").worksheet("Itinerarinellarte")
         logging.info("Foglio aperto con successo: %s", sheet.title)
     except Exception as e:
