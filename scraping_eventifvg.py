@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import time
-import dateparser
 import logging
 
 # Configura il logging
@@ -105,7 +104,42 @@ def main():
         logging.error(f"Errore nell'accesso a Google Sheets: {e}")
         return
 
-    # Proseguire con lo scraping e il caricamento dei dati...
+    # Inizializza il processo di scraping
+    try:
+        logging.info("Inizio dello scraping...")
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        eventi = estrai_eventi(soup)
+        logging.info(f"Eventi trovati: {len(eventi)}")
+
+        if not eventi:
+            logging.info("Nessun evento trovato.")
+            return
+
+        # Rimuovi le righe esistenti nel foglio
+        try:
+            num_rows = len(sheet.get_all_values())
+            if num_rows > 1:
+                sheet.delete_rows(2, num_rows)
+                logging.info("Righe precedenti rimosse.")
+        except Exception as e:
+            logging.error(f"Errore nella rimozione delle righe: {e}")
+            return
+
+        # Prepara i dati da scrivere su Google Sheets
+        righe = [[e['titolo'], e['data'], e['orario'], e['luogo'], e['link'], e['categoria']] for e in eventi]
+
+        # Scrittura dei dati
+        try:
+            sheet.append_rows(righe)
+            logging.info("Dati caricati con successo su Google Sheets.")
+        except Exception as e:
+            logging.error(f"Errore durante l'inserimento dei dati: {e}")
+    except Exception as e:
+        logging.error(f"Errore durante lo scraping: {e}")
 
 if __name__ == "__main__":
     main()
