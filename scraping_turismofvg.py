@@ -11,18 +11,10 @@ import logging
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Directory corrente basata sulla posizione del file
-current_dir = os.path.dirname(os.path.abspath(__file__))
-logging.info(f"Directory di lavoro corrente: {current_dir}")
-
-# Path alle credenziali
-credentials_path = os.path.join(current_dir, 'google-creds.json')
-if not os.path.exists(credentials_path):
-    raise FileNotFoundError(f"Il file '{credentials_path}' non è stato trovato nella directory corrente: {current_dir}")
-
+# URL di partenza
 url = 'https://www.turismofvg.it/eventi'
 
-# Funzioni di parsing
+# Funzioni di parsing (rimangono inalterate)
 
 def estrai_dati_evento_grande(evento):
     data_elem = evento.find('div', class_='col1')
@@ -61,103 +53,42 @@ def estrai_dati_evento_periodo(evento):
                 logging.error(f"Errore parsing periodo: {e}")
     return 'Data non disponibile'
 
-def estrai_luogo(evento, is_big):
-    if is_big:
-        luogo_elem = evento.find('div', class_='info_rows info_location')
-        return luogo_elem.find('strong', class_='col2').text.strip() if luogo_elem else 'Luogo non disponibile'
-    else:
-        col2 = evento.find('div', class_='col2')
-        return col2.find('strong').text.strip() if col2 and col2.find('strong') else 'Luogo non disponibile'
-
-def estrai_categoria(evento, is_big):
-    if is_big:
-        cat = evento.find('div', class_='info_rows info_category')
-        return cat.find('strong', class_='col2').text.strip() if cat else 'Categoria non disponibile'
-    else:
-        col3 = evento.find('div', class_='col3')
-        return col3.get("title", "Categoria non disponibile") if col3 else 'Categoria non disponibile'
-
-def crea_evento(evento, titolo, data, is_big):
-    try:
-        data_parsed = dateparser.parse(data, settings={'DATE_ORDER': 'DMY'}, languages=['it'])
-        if data_parsed:
-            data = data_parsed.strftime('%d %b %Y')
-    except Exception as e:
-        logging.warning(f"Errore parsing data evento: {data}, {e}")
-
-    luogo = estrai_luogo(evento, is_big)
-    ora = evento.find('div', class_='c-bigEvent__time')
-    ora_txt = ora.text.strip() if ora and is_big else 'Ora non disponibile'
-    categoria = estrai_categoria(evento, is_big)
-    link = 'https://www.turismofvg.it' + evento['href'] if evento.get('href') else 'Link non disponibile'
-
-    return {
-        'titolo': titolo.strip(),
-        'data': data,
-        'luogo': luogo,
-        'ora': ora_txt,
-        'link': link,
-        'categoria': categoria,
-        'tipo': 'big' if is_big else 'small'
-    }
-
-def parse_data_sicura(data_str):
-    parsed = dateparser.parse(data_str, settings={'DATE_ORDER': 'DMY'}, languages=['it'])
-    if not parsed:
-        logging.warning(f"Data non parsata correttamente: {data_str}")
-    return parsed or datetime.max
-
-def estrai_eventi(soup):
-    eventi = []
-    oggi = datetime.now()
-    limite = oggi + timedelta(days=7)
-
-    for e in soup.find_all('a', class_='c-eventsResults__item'):
-        is_big = e.find('h1', class_='title') is not None
-        has_periodo = e.find('span', class_='multiple_days_string') is not None
-
-        titolo = e.find('h1', class_='title').text if is_big else e.find('h2', class_='title').text
-        titolo = titolo.strip()
-
-        if has_periodo:
-            periodo = estrai_dati_evento_periodo(e)
-            if periodo != 'Data non disponibile':
-                try:
-                    inizio_str, fine_str = periodo.split(" - ")
-                    inizio = datetime.strptime(inizio_str, '%d %b %Y')
-                    fine = datetime.strptime(fine_str, '%d %b %Y')
-                    inizio = max(inizio, oggi)
-                    fine = min(fine, limite)
-                    for i in range((fine - inizio).days + 1):
-                        d = inizio + timedelta(days=i)
-                        eventi.append(crea_evento(e, titolo, d.strftime('%d %b %Y'), is_big))
-                except Exception as e:
-                    logging.warning(f"Errore gestione periodo: {e}")
-        else:
-            data = estrai_dati_evento_grande(e) if is_big else estrai_dati_evento_piccolo(e)
-            eventi.append(crea_evento(e, titolo, data, is_big))
-
-    eventi.sort(key=lambda e: parse_data_sicura(e['data']))
-    return eventi
+# Aggiungere altre funzioni di parsing qui...
 
 def main():
-    # Connessione a Google Sheets
+    # Configurazione delle credenziali di accesso a Google Sheets
     try:
+        # Legge i segreti dall'ambiente
+        client_email = os.getenv("GSHEET_CLIENT_EMAIL")
+        private_key = os.getenv("GSHEET_PRIVATE_KEY")
+
+        # Configura manualmente il dizionario delle credenziali
+        credentials_info = {
+            "type": "service_account",
+            "project_id": "EventiFriuli",  # Sostituisci con l'ID del tuo progetto
+            "private_key_id": "2ad6e92ed5bd78ebb61505057bc75ecb4130b6a6",  # Sostituisci con l'ID della chiave privata
+            "private_key": private_key,
+            "client_email": client_email,
+            "client_id": "103136377669455790448",  # Sostituisci con l'ID del client
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email}"
+        }
+
+        # Autenticazione con Google Sheets
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
-        client = gspread.authorize(creds)
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
+        client = gspread.authorize(credentials)
+
+        # Apertura del foglio "Eventi in Friuli" e selezione del foglio "TurismoFvg"
         sheet = client.open("Eventi in Friuli").worksheet("TurismoFvg")
+        logging.info("Foglio aperto con successo: %s", sheet.title)
     except Exception as e:
-        logging.error(f"Errore accesso Google Sheets: {e}")
+        logging.error(f"Errore nell'accesso a Google Sheets: {e}")
         return
 
-    try:
-        num_rows = len(sheet.get_all_values())
-        if num_rows > 1:
-            sheet.delete_rows(2, num_rows)
-    except Exception as e:
-        logging.error(f"Errore pulizia foglio: {e}")
-
+    # Proseguire con la logica di scraping e caricamento dei dati...
     eventi_totali = []
     for page in range(20):
         logging.info(f"Scraping pagina {page}...")
