@@ -1,4 +1,4 @@
-name: Test Scraping EventiFVG
+name: Test Scraping Unionedati
 
 on:
   workflow_dispatch: # Permette di avviare manualmente il workflow
