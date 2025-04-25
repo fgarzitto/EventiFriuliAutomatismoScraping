@@ -36,4 +36,4 @@ def test_google_sheet_access():
         exit(1)
 
 if __name__ == "__main__":
-    test_google_sheet_access()
+    test_google_sheet_access() #ciao
