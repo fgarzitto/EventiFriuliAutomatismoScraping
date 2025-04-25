@@ -30,4 +30,4 @@ jobs:
           GSHEET_CLIENT_EMAIL: ${{ secrets.GSHEET_CLIENT_EMAIL }}
           GSHEET_PRIVATE_KEY: ${{ secrets.GSHEET_PRIVATE_KEY }}
         run: |
-          python scraping_eventiFVG.py
+          python unione_dati_scraping.py
