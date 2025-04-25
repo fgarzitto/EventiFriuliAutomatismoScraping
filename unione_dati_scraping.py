@@ -16,7 +16,10 @@ url = 'https://www.eventifvg.it/'
 
 def estrai_eventi(soup):
     eventi = []
+
+    # Trova tutti gli eventi nella pagina
     for evento in soup.find_all('div', class_='tribe-common-g-row tribe-events-calendar-list__event-row'):
+        # Estrazione del titolo
         titolo_elem = evento.find('h3', class_='tribe-events-calendar-list__event-title')
         if titolo_elem:
             link_elem = titolo_elem.find('a', class_='tribe-events-calendar-list__event-title-link')
@@ -26,6 +29,7 @@ def estrai_eventi(soup):
             titolo = 'Titolo non disponibile'
             link = 'Link non disponibile'
 
+        # Estrazione della data
         data_elem = evento.find('time', class_='tribe-events-calendar-list__event-date-tag-datetime')
         if data_elem and data_elem.has_attr('datetime'):
             data_raw = data_elem['datetime']
@@ -33,6 +37,7 @@ def estrai_eventi(soup):
         else:
             data = 'Data non disponibile'
 
+        # Estrazione dell'orario di inizio
         orario_elem = evento.find('time', class_='tribe-events-calendar-list__event-datetime')
         if orario_elem:
             orario_start_elem = orario_elem.find('span', class_='tribe-event-date-start')
@@ -40,6 +45,7 @@ def estrai_eventi(soup):
         else:
             orario = 'Orario non disponibile'
 
+        # Estrazione del luogo
         luogo_elem = evento.find('address', class_='tribe-events-calendar-list__event-venue')
         if luogo_elem:
             luogo_title_elem = luogo_elem.find('span', class_='tribe-events-calendar-list__event-venue-title')
@@ -47,7 +53,8 @@ def estrai_eventi(soup):
         else:
             luogo = 'Luogo non disponibile'
 
-        categoria = ''  # Campo vuoto
+        # La categoria non è specificata, quindi la lasciamo vuota
+        categoria = ''
 
         evento_data = {
             'titolo': titolo,
@@ -65,50 +72,46 @@ def estrai_eventi(soup):
 
 def main():
     try:
-        # Legge i segreti dall'ambiente
+        # Autenticazione tramite variabili d'ambiente
         client_email = os.getenv("GSHEET_CLIENT_EMAIL")
         private_key = os.getenv("GSHEET_PRIVATE_KEY")
 
-        # Configura manualmente il dizionario delle credenziali
         credentials_info = {
             "type": "service_account",
-            "project_id": "EventiFriuli",  # Sostituisci con l'ID del tuo progetto
-            "private_key_id": "2ad6e92ed5bd78ebb61505057bc75ecb4130b6a6",  # Sostituisci con l'ID della chiave privata
+            "project_id": "EventiFriuli",
+            "private_key_id": "2ad6e92ed5bd78ebb61505057bc75ecb4130b6a6",
             "private_key": private_key,
             "client_email": client_email,
-            "client_id": "103136377669455790448",  # Sostituisci con l'ID del client
+            "client_id": "103136377669455790448",
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
             "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email}"
         }
 
-        # Autenticazione con Google Sheets
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
         client = gspread.authorize(credentials)
 
-        # Apertura del foglio "Eventi in Friuli" e selezione del foglio "Foglio2"
+        # Apertura del foglio Google Sheets
         sheet = client.open("Eventi in Friuli").worksheet("Foglio2")
-        logging.info(f"Foglio aperto con successo: {sheet.title}")
+        logging.info("Foglio aperto con successo: %s", sheet.title)
     except Exception as e:
         logging.error(f"Errore nell'accesso a Google Sheets: {e}")
         return
 
     try:
+        # Verifica e cancella righe esistenti
         num_rows = len(sheet.get_all_values())
         if num_rows > 1:
             sheet.delete_rows(2, num_rows)
             logging.info("Righe cancellate con successo.")
-        else:
-            logging.info("Nessuna riga da cancellare.")
     except Exception as e:
         logging.error(f"Errore nella cancellazione delle righe: {e}")
         return
 
     eventi_totali = []
     url_da_scrapare = url
-
     data_corrente = datetime.now()
     data_limite = data_corrente + timedelta(days=7)
 
@@ -125,7 +128,7 @@ def main():
 
         soup = BeautifulSoup(response.content, 'html.parser')
         eventi_pagina = estrai_eventi(soup)
-
+        
         if not eventi_pagina:
             logging.info("Nessun evento trovato nella pagina.")
             break
@@ -144,13 +147,8 @@ def main():
 
             eventi_totali.append(evento)
 
-        if url_da_scrapare:
-            next_page_elem = soup.find('a', class_='tribe-events-c-nav__next')
-            if next_page_elem and next_page_elem.has_attr('href'):
-                url_da_scrapare = next_page_elem['href']
-            else:
-                logging.info("Nessuna pagina successiva trovata, fermiamo lo scraping.")
-                break
+        next_page_elem = soup.find('a', class_='tribe-events-c-nav__next')
+        url_da_scrapare = next_page_elem['href'] if next_page_elem and next_page_elem.has_attr('href') else None
 
         time.sleep(2)
 
