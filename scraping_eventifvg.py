@@ -1,7 +1,6 @@
 import os
 import requests
 from bs4 import BeautifulSoup
-import json
 from datetime import datetime, timedelta
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -12,29 +11,11 @@ import logging
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Directory corrente basata sulla posizione del file
-current_dir = os.path.dirname(os.path.abspath(__file__))
-logging.info(f"Directory di lavoro corrente: {current_dir}")
-
-# Controlla se il file delle credenziali esiste
-credentials_path = os.path.join(current_dir, 'google-creds.json')
-if not os.path.exists(credentials_path):
-    raise FileNotFoundError(f"Il file '{credentials_path}' non è stato trovato nella directory corrente: {current_dir}")
-
-# Verifica che il file delle credenziali sia un JSON valido
-try:
-    with open(credentials_path, 'r') as file:
-        json.load(file)
-    logging.info(f"Il file delle credenziali '{credentials_path}' è valido.")
-except json.JSONDecodeError:
-    raise ValueError(f"Il file '{credentials_path}' non contiene un JSON valido.")
-
 # URL di partenza
 url = 'https://www.eventifvg.it/'
 
 def estrai_eventi(soup):
     eventi = []
-
     # Trova tutti gli eventi nella pagina
     for evento in soup.find_all('div', class_='tribe-common-g-row tribe-events-calendar-list__event-row'):
         # Estrazione del titolo
@@ -50,7 +31,6 @@ def estrai_eventi(soup):
         # Estrazione della data
         data_elem = evento.find('time', class_='tribe-events-calendar-list__event-date-tag-datetime')
         if data_elem and data_elem.has_attr('datetime'):
-            # Converte la data nel formato "20 Apr 2025"
             data_raw = data_elem['datetime']
             try:
                 data = datetime.strptime(data_raw, '%Y-%m-%d').strftime('%d %b %Y')
@@ -93,16 +73,30 @@ def estrai_eventi(soup):
 
     return eventi
 
-def data_to_datetime(data_str):
-    # Data passata come stringa per la conversione
-    return dateparser.parse(data_str, settings={'PREFER_DATES_FROM': 'future'})
-
 def main():
     try:
+        # Legge i segreti dall'ambiente
+        client_email = os.getenv("GSHEET_CLIENT_EMAIL")
+        private_key = os.getenv("GSHEET_PRIVATE_KEY")
+
+        # Configura manualmente il dizionario delle credenziali
+        credentials_info = {
+            "type": "service_account",
+            "project_id": "EventiFriuli",  # Sostituisci con l'ID del tuo progetto
+            "private_key_id": "2ad6e92ed5bd78ebb61505057bc75ecb4130b6a6",  # Sostituisci con l'ID della chiave privata
+            "private_key": private_key,
+            "client_email": client_email,
+            "client_id": "103136377669455790448",  # Sostituisci con l'ID del client
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email}"
+        }
+
         # Autenticazione con Google Sheets
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
-        client = gspread.authorize(creds)
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
+        client = gspread.authorize(credentials)
 
         # Apertura del foglio "Eventi in Friuli" e selezione del foglio "EventiFvg"
         sheet = client.open("Eventi in Friuli").worksheet("EventiFvg")
@@ -111,80 +105,7 @@ def main():
         logging.error(f"Errore nell'accesso a Google Sheets: {e}")
         return
 
-    try:
-        # Verifica quante righe ci sono nel foglio
-        num_rows = len(sheet.get_all_values())
-
-        # Se ci sono più di una riga (ad esempio, l'intestazione), cancelliamo le righe esistenti
-        if num_rows > 1:
-            sheet.delete_rows(2, num_rows)
-            logging.info("Righe cancellate con successo.")
-        else:
-            logging.info("Nessuna riga da cancellare.")
-    except Exception as e:
-        logging.error(f"Errore nella cancellazione delle righe: {e}")
-        return
-
-    eventi_totali = []
-    url_da_scrapare = url  # URL iniziale (prima pagina)
-
-    # Calcola la data limite (7 giorni dalla data corrente)
-    data_corrente = datetime.now()
-    data_limite = data_corrente + timedelta(days=7)
-
-    while url_da_scrapare:
-        logging.info(f"Scraping URL: {url_da_scrapare}")
-
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            response = requests.get(url_da_scrapare, headers=headers)
-            response.raise_for_status()
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Errore nella richiesta dell'URL {url_da_scrapare}: {e}")
-            break
-
-        soup = BeautifulSoup(response.content, 'html.parser')
-        eventi_pagina = estrai_eventi(soup)
-
-        if not eventi_pagina:
-            logging.info("Nessun evento trovato nella pagina.")
-            break
-
-        for evento in eventi_pagina:
-            try:
-                data_evento = datetime.strptime(evento['data'], '%d %b %Y')
-                if data_evento > data_limite:
-                    logging.info(f"Raggiunta la data limite: {data_evento}. Interrompiamo lo scraping.")
-                    url_da_scrapare = None
-                    break
-            except ValueError:
-                logging.warning(f"Impossibile analizzare la data dell'evento: {evento['data']}")
-                continue
-
-            eventi_totali.append(evento)
-
-        if url_da_scrapare:
-            next_page_elem = soup.find('a', class_='tribe-events-c-nav__next')
-            if next_page_elem and next_page_elem.has_attr('href'):
-                url_da_scrapare = next_page_elem['href']
-            else:
-                logging.info("Nessuna pagina successiva trovata, fermiamo lo scraping.")
-                break
-
-        time.sleep(2)
-
-    if eventi_totali:
-        eventi_to_append = [[e['titolo'], e['data'], e['orario'], e['luogo'], e['link'], e['categoria']] for e in eventi_totali]
-        logging.info(f"Dati da caricare su Google Sheets: {eventi_to_append}")
-        try:
-            sheet.append_rows(eventi_to_append)
-            logging.info("Dati caricati su Google Sheets")
-        except Exception as e:
-            logging.error(f"Errore nel caricamento su Google Sheets: {e}")
-    else:
-        logging.info("Nessun evento da caricare su Google Sheets.")
+    # Proseguire con lo scraping e il caricamento dei dati...
 
 if __name__ == "__main__":
     main()
