@@ -25,7 +25,7 @@ jobs:
           pip install -r requirements.txt # Assicurati che il file requirements.txt sia completo e corretto
 
       # Esegui lo script di scraping
-      - name: Run scraping_eventiFVG.py
+      - name: Run unione_dati_scraping.py
         env:
           GSHEET_CLIENT_EMAIL: ${{ secrets.GSHEET_CLIENT_EMAIL }}
           GSHEET_PRIVATE_KEY: ${{ secrets.GSHEET_PRIVATE_KEY }}
