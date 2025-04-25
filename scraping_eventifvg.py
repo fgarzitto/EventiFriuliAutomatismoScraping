@@ -6,16 +6,25 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import time
 import logging
-import locale
-
-# Configura il locale per utilizzare i nomi dei mesi in italiano
-locale.setlocale(locale.LC_TIME, 'it_IT.utf8')
 
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Mappa manuale dei nomi dei mesi in italiano
+mesi_italiani = {
+    "Jan": "Gen", "Feb": "Feb", "Mar": "Mar", "Apr": "Apr", "May": "Mag", "Jun": "Giu",
+    "Jul": "Lug", "Aug": "Ago", "Sep": "Set", "Oct": "Ott", "Nov": "Nov", "Dec": "Dic"
+}
+
 # URL di partenza
 url = 'https://www.eventifvg.it/'
+
+def formatta_data_italiana(data_raw):
+    """Converte una data in formato italiano (es. 25 Apr 2025)."""
+    data = datetime.strptime(data_raw, '%Y-%m-%d')
+    mese_inglese = data.strftime('%b')
+    mese_italiano = mesi_italiani.get(mese_inglese, mese_inglese)
+    return data.strftime(f'%d {mese_italiano} %Y')
 
 def estrai_eventi(soup):
     eventi = []
@@ -37,7 +46,7 @@ def estrai_eventi(soup):
         if data_elem and data_elem.has_attr('datetime'):
             data_raw = data_elem['datetime']
             try:
-                data = datetime.strptime(data_raw, '%Y-%m-%d').strftime('%d %b %Y')
+                data = formatta_data_italiana(data_raw)
             except ValueError:
                 data = 'Data non disponibile'
         else:
