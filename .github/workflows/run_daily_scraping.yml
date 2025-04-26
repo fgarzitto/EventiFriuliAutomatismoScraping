@@ -22,14 +22,23 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Imposta credenziali Google
+        env:
+          GSHEET_CLIENT_EMAIL: ${{ secrets.GSHEET_CLIENT_EMAIL }}
+          GSHEET_PRIVATE_KEY: ${{ secrets.GSHEET_PRIVATE_KEY }}
+        run: echo "Credenziali Google impostate come variabili d'ambiente."
+
       - name: Run all scripts
+        env:
+          GSHEET_CLIENT_EMAIL: ${{ secrets.GSHEET_CLIENT_EMAIL }}
+          GSHEET_PRIVATE_KEY: ${{ secrets.GSHEET_PRIVATE_KEY }}
         run: |
           set -e  # Ferma l'esecuzione se ci sono errori
           echo "Esecuzione scraping_eventifvg.py"
-          python scraping_eventifvg.py || echo "Errore nello script scraping_eventifvg.py"
+          python scraping_eventifvg.py
           echo "Esecuzione scraping_itinerarinellarte.py"
-          python scraping_itinerarinellarte.py || echo "Errore nello script scraping_itinerarinellarte.py"
+          python scraping_itinerarinellarte.py
           echo "Esecuzione scraping_turismofvg.py"
-          python scraping_turismofvg.py || echo "Errore nello script scraping_turismofvg.py"
+          python scraping_turismofvg.py
           echo "Esecuzione unione_dati_scraping.py"
-          python unione_dati_scraping.py || echo "Errore nello script unione_dati_scraping.py"
+          python unione_dati_scraping.py
