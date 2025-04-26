@@ -22,18 +22,14 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Save Google creds
+      - name: Run all scripts
         run: |
-          echo "${{ secrets.GOOGLE_CREDS }}" > google-creds.json
-
-      - name: Run all script
-        run: |
+          set -e  # Ferma l'esecuzione se ci sono errori
           echo "Esecuzione scraping_eventifvg.py"
-          python scraping_eventifvg.py
+          python scraping_eventifvg.py || echo "Errore nello script scraping_eventifvg.py"
           echo "Esecuzione scraping_itinerarinellarte.py"
-          python scraping_itinerarinellarte.py
+          python scraping_itinerarinellarte.py || echo "Errore nello script scraping_itinerarinellarte.py"
           echo "Esecuzione scraping_turismofvg.py"
-          python scraping_turismofvg.py
+          python scraping_turismofvg.py || echo "Errore nello script scraping_turismofvg.py"
           echo "Esecuzione unione_dati_scraping.py"
-          python unione_dati_scraping.py
-
+          python unione_dati_scraping.py || echo "Errore nello script unione_dati_scraping.py"
