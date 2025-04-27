@@ -44,7 +44,12 @@ def estrai_eventi(soup):
             except ValueError:
                 data = None
         else:
-            data = None
+            # Fallback: prova a estrarre la data dai figli del tag <time>
+            try:
+                data_text = ''.join(data_elem.stripped_strings) if data_elem else ''
+                data = datetime.strptime(data_text, '%d %b %Y')  # Adatta il formato se necessario
+            except (ValueError, AttributeError):
+                data = None
 
         # Estrazione dell'orario di inizio
         orario_elem = evento.find('time', class_='tribe-events-calendar-list__event-datetime')
