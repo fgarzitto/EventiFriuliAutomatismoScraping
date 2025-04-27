@@ -58,8 +58,8 @@ def estrai_eventi(soup):
                     data_corrente = data_inizio + timedelta(days=i)
                     evento_data = {
                         'titolo': titolo,
-                        'descrizione': descrizione,
                         'data': data_corrente.strftime("%d %b %Y"),  # Formatta la data come 20 Apr 2025
+                        'ora': 'Ora non disponibile',  # Ora predefinita,
                         'luogo': 'Luogo non disponibile',
                         'link': link,
                         'categoria': 'Mostre',
