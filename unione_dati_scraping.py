@@ -28,27 +28,30 @@ def unisci_e_ordina_eventi():
         client = gspread.authorize(credentials)
 
         # Apertura del Google Sheet
-        spreadsheet = client.open("Eventi in Friuli")  # Nome del Google Sheet
+        spreadsheet = client.open("Eventi in Friuli")
         all_sheets = spreadsheet.worksheets()
 
         # Lettura di tutti i dati dai fogli (escluso il primo)
         all_data = []
-        for sheet in all_sheets[1:]:  # Salta il primo tab
+        for sheet in all_sheets[1:]:
             records = sheet.get_all_records()
             all_data.extend(records)
 
-        # Conversione dei dati in un DataFrame Pandas
+        # Conversione in DataFrame
         df = pd.DataFrame(all_data)
 
         # Assicurarsi che la colonna 'data' sia in formato datetime
         if 'data' in df.columns:
-            df['data'] = pd.to_datetime(df['data'], format='%d %b', errors='coerce')
+            df['data'] = pd.to_datetime(df['data'], format='%d %b %Y', errors='coerce')
             df = df.sort_values(by='data')  # Ordina per data
+
+            # Dopo l'ordinamento puoi riformattare la data in stringa se vuoi
+            df['data'] = df['data'].dt.strftime('%d %b %Y')
 
         # Scrittura nel primo tab
         first_sheet = all_sheets[0]
-        first_sheet.clear()  # Cancella tutti i dati esistenti
-        first_sheet.update([df.columns.values.tolist()] + df.fillna('').values.tolist())  # Aggiorna con nuovi dati
+        first_sheet.clear()
+        first_sheet.update([df.columns.values.tolist()] + df.fillna('').values.tolist())
 
         print("Dati copiati e ordinati con successo nel primo tab!")
 
