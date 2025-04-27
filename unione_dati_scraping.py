@@ -4,6 +4,23 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import datetime
 
+# Mappa dei mesi in italiano (completi)
+mesi_italiani = {
+    "gennaio": "01", "febbraio": "02", "marzo": "03", "aprile": "04", "maggio": "05", "giugno": "06",
+    "luglio": "07", "agosto": "08", "settembre": "09", "ottobre": "10", "novembre": "11", "dicembre": "12"
+}
+
+def converti_data_italiana(data_str):
+    try:
+        # Sostituisci i mesi italiani con il formato numerico
+        for mese, numero in mesi_italiani.items():
+            data_str = data_str.lower().replace(mese, numero)
+        # Converte la stringa nel formato "dd mm yyyy"
+        return datetime.strptime(data_str.strip(), "%d %m %Y")
+    except ValueError:
+        print(f"⚠️ Data non valida: {data_str}")
+        return pd.NaT
+
 def unisci_e_ordina_eventi():
     try:
         # Autenticazione tramite variabili d'ambiente
@@ -59,17 +76,8 @@ def unisci_e_ordina_eventi():
             # Forziamo la colonna 'Data' a essere stringa
             df['Data'] = df['Data'].astype(str)
 
-            # Funzione per convertire le date in oggetti datetime
-            def converti_data(x):
-                try:
-                    # Se la data è nel formato "30 Apr 2025"
-                    return datetime.strptime(x.strip(), "%d %b %Y")
-                except ValueError:
-                    print(f"⚠️ Data non valida: {x}")  # Avviso per valori errati
-                    return pd.NaT  # Se fallisce, mettiamo "Not a Time"
-
-            # Applica la conversione alla colonna 'Data'
-            df['Data_parsed'] = df['Data'].apply(converti_data)
+            # Applica la conversione delle date in formato italiano
+            df['Data_parsed'] = df['Data'].apply(converti_data_italiana)
 
             # Debug: stampa dei risultati della conversione
             print("Valori di 'Data_parsed' dopo la conversione:")
