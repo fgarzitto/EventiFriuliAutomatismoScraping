@@ -75,7 +75,7 @@ def estrai_eventi(soup):
                     data_formattata = f"{data_corrente.day:02d} {mesi[data_corrente.month]} {data_corrente.year}"
                     evento_data = {
                         'titolo': titolo,
-                        'data': data_corrente.strftime("%d %b %Y"),  # Formatta la data come 20 Apr 2025
+                        'data': data_formattata,
                         'ora': 'Ora non disponibile',  # Ora predefinita,
                         'luogo': luogo,
                         'link': link,
