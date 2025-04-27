@@ -38,9 +38,13 @@ def estrai_eventi(soup):
                 if link.startswith('/'):
                     link = f"https://www.itinerarinellarte.it{link}"
 
-        # Estrazione della descrizione
-        descrizione_elem = evento.find('p', class_='abstract')
-        descrizione = descrizione_elem.text.strip() if descrizione_elem else 'Descrizione non disponibile'
+         # Estrazione del luogo
+        luogo = 'Luogo non disponibile'
+        luogo_elem = evento.find('h3')
+        if luogo_elem:
+            link_luoghi = luogo_elem.find_all('a')
+            if len(link_luoghi) > 1:  # Assicurati che ci siano almeno 2 link
+                luogo = link_luoghi[1].text.strip()  # Prendi il secondo link
 
         # Estrazione del periodo delle date
         date_elems = evento.find_all('span', class_='eventi-data')
