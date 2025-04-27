@@ -47,7 +47,10 @@ def estrai_eventi(soup):
             # Fallback: prova a estrarre la data dai figli del tag <time>
             try:
                 data_text = ''.join(data_elem.stripped_strings) if data_elem else ''
+                # Converti la data dal formato inglese
                 data = datetime.strptime(data_text, '%d %b %Y')  # Adatta il formato se necessario
+                # Traduci il mese in italiano
+                data = data.strftime(f"%d {mesi_italiani[data.strftime('%b')]} %Y")
             except (ValueError, AttributeError):
                 data = None
 
