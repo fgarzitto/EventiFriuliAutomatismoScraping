@@ -24,13 +24,10 @@ def estrai_eventi(soup):
         7: "Lug", 8: "Ago", 9: "Set", 10: "Ott", 11: "Nov", 12: "Dic"
     }
 
-    # Trova tutti gli eventi nella pagina
     for evento in soup.find_all('div', class_='col-date col-lg-6 col-sm-12 texts'):
-        # Estrazione del titolo
         titolo_elem = evento.find('h4')
         titolo = titolo_elem.text.strip() if titolo_elem else 'Titolo non disponibile'
 
-        # Estrazione del link all'evento
         link = 'Link non disponibile'
         link_elem = evento.find('a', class_='pic', href=True)
         if link_elem:
@@ -44,21 +41,18 @@ def estrai_eventi(soup):
                 if link.startswith('/'):
                     link = f"https://www.itinerarinellarte.it{link}"
 
-        # Estrazione del luogo
         luogo = 'Luogo non disponibile'
         luogo_elem = evento.find('h3')
         if luogo_elem:
-            # Cerca tutti i link (<a>) all'interno dell'elemento <h3>
             link_luoghi = luogo_elem.find_all('a')
-            if len(link_luoghi) > 1:  # Assicurati che ci siano almeno 2 link
-                luogo = link_luoghi[1].text.strip()  # Prendi il testo del secondo link
+            if len(link_luoghi) > 1:
+                luogo = link_luoghi[1].text.strip()
                 logging.info(f"Luogo estratto: {luogo}")
             else:
                 logging.warning("Non ci sono abbastanza link per determinare il luogo.")
         else:
             logging.warning("Elemento <h3> non trovato per questo evento.")
 
-        # Estrazione del periodo delle date
         date_elems = evento.find_all('span', class_='eventi-data')
         if date_elems and len(date_elems) >= 2:
             data_inizio = date_elems[0].text.strip()
@@ -66,17 +60,17 @@ def estrai_eventi(soup):
             try:
                 data_inizio = datetime.strptime(data_inizio, "%d/%m/%Y")
                 data_fine = datetime.strptime(data_fine, "%d/%m/%Y")
-                data_inizio = max(data_inizio, oggi)  # Limita l'inizio alla data odierna
-                data_fine = min(data_fine, limite)  # Limita la fine ai prossimi 7 giorni
+                data_inizio = max(data_inizio, oggi)
+                data_fine = min(data_fine, limite)
 
-                # Genera un evento per ogni giorno nell'intervallo
                 for i in range((data_fine - data_inizio).days + 1):
                     data_corrente = data_inizio + timedelta(days=i)
                     data_formattata = f"{data_corrente.day:02d} {mesi[data_corrente.month]} {data_corrente.year}"
                     evento_data = {
                         'titolo': titolo,
                         'data': data_formattata,
-                        'ora': 'Ora non disponibile',  # Ora predefinita,
+                        'data_sort': data_corrente,  # <-- Aggiunto campo per ordinare
+                        'ora': 'Ora non disponibile',
                         'luogo': luogo,
                         'link': link,
                         'categoria': 'Mostre',
@@ -90,17 +84,16 @@ def estrai_eventi(soup):
 
 def main():
     try:
-        # Autenticazione con Google Sheets utilizzando variabili d'ambiente
         client_email = os.getenv("GSHEET_CLIENT_EMAIL")
         private_key = os.getenv("GSHEET_PRIVATE_KEY")
 
         credentials_info = {
             "type": "service_account",
             "project_id": "EventiFriuli",
-            "private_key_id": "2ad6e92ed5bd78ebb61505057bc75ecb4130b6a6",  # Sostituisci con il tuo ID
+            "private_key_id": "2ad6e92ed5bd78ebb61505057bc75ecb4130b6a6",
             "private_key": private_key,
             "client_email": client_email,
-            "client_id": "103136377669455790448",  # Sostituisci con il tuo client ID
+            "client_id": "103136377669455790448",
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
@@ -111,7 +104,6 @@ def main():
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
         client = gspread.authorize(credentials)
 
-        # Apertura del foglio Google Sheets
         sheet = client.open("Eventi in Friuli").worksheet("Itinerarinellarte")
         logging.info("Foglio aperto con successo: %s", sheet.title)
     except Exception as e:
@@ -155,7 +147,7 @@ def main():
         time.sleep(2)
 
     if eventi_totali:
-        eventi_totali.sort(key=lambda e: datetime.strptime(e['data'], "%d %b %Y"))
+        eventi_totali.sort(key=lambda e: e['data_sort'])  # <-- Ordinamento corretto
         eventi_to_append = [[e['titolo'], e['data'], e['ora'], e['luogo'], e['link'], e['categoria']] for e in eventi_totali]
         try:
             sheet.append_rows(eventi_to_append)
