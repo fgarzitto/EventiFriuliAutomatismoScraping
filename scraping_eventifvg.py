@@ -171,7 +171,7 @@ def main():
         righe = [
             [
                 e['titolo'],
-                e['data'].strftime("%d %b %Y") if e['data'] else "Data non disponibile",
+                f"{e['data'].day:02d} {mesi_italiani[e['data'].strftime('%b')]} {e['data'].year}" if e['data'] else "Data non disponibile",
                 e['orario'],
                 e['luogo'],
                 e['link'],
