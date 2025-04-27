@@ -139,7 +139,7 @@ def main():
 
     if eventi_totali:
         eventi_totali.sort(key=lambda e: datetime.strptime(e['data'], "%d %b %Y"))
-        eventi_to_append = [[e['titolo'], e['data'], e['descrizione'], e['luogo'], e['link'], e['categoria']] for e in eventi_totali]
+        eventi_to_append = [[e['titolo'], e['data'], e['ora'], e['luogo'], e['link'], e['categoria']] for e in eventi_totali]
         try:
             sheet.append_rows(eventi_to_append)
             logging.info("Dati caricati su Google Sheets")
