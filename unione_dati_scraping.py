@@ -2,7 +2,7 @@ import os
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def unisci_e_ordina_eventi():
     try:
@@ -40,12 +40,23 @@ def unisci_e_ordina_eventi():
         # Conversione in DataFrame
         df = pd.DataFrame(all_data)
 
-        # Assicurarsi che la colonna 'data' sia in formato datetime
+        # Gestione della colonna 'data'
         if 'data' in df.columns:
-            df['data'] = pd.to_datetime(df['data'], format='%d %b %Y', errors='coerce')
-            df = df.sort_values(by='data')  # Ordina per data
+            # Prima controlliamo se sono numeri (seriali di Excel/Sheets)
+            def converti_data(x):
+                if isinstance(x, (int, float)):  # Se è un numero
+                    return datetime(1899, 12, 30) + timedelta(days=x)
+                try:
+                    return datetime.strptime(x, '%d %b %Y')
+                except:
+                    return pd.NaT
 
-            # Dopo l'ordinamento puoi riformattare la data in stringa se vuoi
+            df['data'] = df['data'].apply(converti_data)
+
+            # Ordina per data
+            df = df.sort_values(by='data')
+
+            # Dopo l'ordinamento rimetti la data come testo
             df['data'] = df['data'].dt.strftime('%d %b %Y')
 
         # Scrittura nel primo tab
