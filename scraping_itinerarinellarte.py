@@ -38,13 +38,19 @@ def estrai_eventi(soup):
                 if link.startswith('/'):
                     link = f"https://www.itinerarinellarte.it{link}"
 
-         # Estrazione del luogo
+        # Estrazione del luogo
         luogo = 'Luogo non disponibile'
         luogo_elem = evento.find('h3')
         if luogo_elem:
+            # Cerca tutti i link (<a>) all'interno dell'elemento <h3>
             link_luoghi = luogo_elem.find_all('a')
             if len(link_luoghi) > 1:  # Assicurati che ci siano almeno 2 link
-                luogo = link_luoghi[1].text.strip()  # Prendi il secondo link
+                luogo = link_luoghi[1].text.strip()  # Prendi il testo del secondo link
+                logging.info(f"Luogo estratto: {luogo}")
+            else:
+                logging.warning("Non ci sono abbastanza link per determinare il luogo.")
+        else:
+            logging.warning("Elemento <h3> non trovato per questo evento.")
 
         # Estrazione del periodo delle date
         date_elems = evento.find_all('span', class_='eventi-data')
