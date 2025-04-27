@@ -48,9 +48,10 @@ def estrai_eventi(soup):
             try:
                 data_text = ''.join(data_elem.stripped_strings) if data_elem else ''
                 # Converti la data dal formato inglese
-                data = datetime.strptime(data_text, '%d %b %Y')  # Adatta il formato se necessario
-                # Traduci il mese in italiano
-                data = data.strftime(f"%d {mesi_italiani[data.strftime('%b')]} %Y")
+                data = datetime.strptime(data_text, '%d %b %Y')
+                # Traduci il mese in italiano usando la mappa
+                mese_italiano = mesi_italiani[data.strftime('%b')]
+                data = data.strftime(f"%d {mese_italiano} %Y")
             except (ValueError, AttributeError):
                 data = None
 
