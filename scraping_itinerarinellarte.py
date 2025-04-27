@@ -18,6 +18,12 @@ def estrai_eventi(soup):
     oggi = datetime.now()
     limite = oggi + timedelta(days=7)
 
+    # Mappa dei mesi in italiano
+    mesi = {
+        1: "Gen", 2: "Feb", 3: "Mar", 4: "Apr", 5: "Mag", 6: "Giu",
+        7: "Lug", 8: "Ago", 9: "Set", 10: "Ott", 11: "Nov", 12: "Dic"
+    }
+
     # Trova tutti gli eventi nella pagina
     for evento in soup.find_all('div', class_='col-date col-lg-6 col-sm-12 texts'):
         # Estrazione del titolo
@@ -66,6 +72,7 @@ def estrai_eventi(soup):
                 # Genera un evento per ogni giorno nell'intervallo
                 for i in range((data_fine - data_inizio).days + 1):
                     data_corrente = data_inizio + timedelta(days=i)
+                    data_formattata = f"{data_corrente.day:02d} {mesi[data_corrente.month]} {data_corrente.year}"
                     evento_data = {
                         'titolo': titolo,
                         'data': data_corrente.strftime("%d %b %Y"),  # Formatta la data come 20 Apr 2025
