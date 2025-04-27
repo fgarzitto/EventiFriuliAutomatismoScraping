@@ -1,4 +1,4 @@
-name: Scraping Itinerarinellarte
+name: Test Scraping Itinerarinellarte
 
 on:
   schedule:
