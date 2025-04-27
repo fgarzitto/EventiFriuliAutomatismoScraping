@@ -4,19 +4,30 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import datetime
 
-# Mappa dei mesi in italiano (completi e abbreviati)
+# Mappa dei mesi completi e abbreviati in italiano
 mesi_italiani = {
     "gennaio": "01", "febbraio": "02", "marzo": "03", "aprile": "04", "maggio": "05", "giugno": "06",
     "luglio": "07", "agosto": "08", "settembre": "09", "ottobre": "10", "novembre": "11", "dicembre": "12",
     "gen": "Jan", "feb": "Feb", "mar": "Mar", "apr": "Apr", "mag": "May", "giu": "Jun",
-    "lug": "Jul", "ago": "Aug", "set": "Sep", "ott": "Oct", "nov": "Nov", "dic": "Dec"
+    "lug": "Jul", "ago": "Ago", "set": "Sep", "ott": "Oct", "nov": "Nov", "dic": "Dec"
 }
+
+# Mappa per tradurre i mesi abbreviati inglesi in italiano
+mesi_abbreviati_ita = {
+    "Jan": "Gen", "Feb": "Feb", "Mar": "Mar", "Apr": "Apr", "May": "Mag", "Jun": "Giu",
+    "Jul": "Lug", "Aug": "Ago", "Sep": "Set", "Oct": "Ott", "Nov": "Nov", "Dec": "Dic"
+}
+
+def traduci_mese_in_italiano(data_str):
+    """Sostituisce i mesi inglesi abbreviati con quelli in italiano."""
+    for mese_eng, mese_ita in mesi_abbreviati_ita.items():
+        data_str = data_str.replace(mese_eng, mese_ita)
+    return data_str
 
 def traduci_data(data_str):
     """Sostituisce i mesi italiani (completi o abbreviati) con quelli in formato numerico o inglese."""
-    # Gestione dei mesi completi (es. "aprile")
-    for mese_completo, numero in mesi_italiani.items():
-        data_str = data_str.lower().replace(mese_completo, numero)
+    for mese, sostituto in mesi_italiani.items():
+        data_str = data_str.lower().replace(mese, sostituto)
     return data_str
 
 def converti_data(data_str):
@@ -104,6 +115,9 @@ def unisci_e_ordina_eventi():
 
             # Riformattiamo la colonna 'Data' in formato desiderato
             df['Data'] = df['Data_parsed'].dt.strftime('%d %b %Y')
+
+            # Traduci i mesi inglesi abbreviati in italiano
+            df['Data'] = df['Data'].apply(traduci_mese_in_italiano)
 
             # Eliminiamo la colonna temporanea usata per il parsing
             df = df.drop(columns=['Data_parsed'])
