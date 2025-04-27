@@ -70,7 +70,7 @@ def estrai_eventi(soup):
                         'titolo': titolo,
                         'data': data_corrente.strftime("%d %b %Y"),  # Formatta la data come 20 Apr 2025
                         'ora': 'Ora non disponibile',  # Ora predefinita,
-                        'luogo': 'Luogo non disponibile',
+                        'luogo': luogo,
                         'link': link,
                         'categoria': 'Mostre',
                     }
