@@ -2,7 +2,7 @@ import os
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
 def unisci_e_ordina_eventi():
     try:
@@ -40,34 +40,40 @@ def unisci_e_ordina_eventi():
         # Conversione in DataFrame
         df = pd.DataFrame(all_data)
 
-        # Gestione della colonna 'data'
         if 'data' in df.columns:
-            # Prima controlliamo se sono numeri (seriali di Excel/Sheets)
+            # Forziamo la colonna 'data' a essere stringa
+            df['data'] = df['data'].astype(str)
+
+            # Proviamo a convertire tutte le date
             def converti_data(x):
-                if isinstance(x, (int, float)):  # Se è un numero
-                    return datetime(1899, 12, 30) + timedelta(days=x)
                 try:
-                    return datetime.strptime(x, '%d %b %Y')
-                except:
-                    return pd.NaT
+                    return datetime.strptime(x.strip(), "%d %b %Y")
+                except ValueError:
+                    return pd.NaT  # Se fallisce, mettiamo "Not a Time"
 
-            df['data'] = df['data'].apply(converti_data)
+            df['data_parsed'] = df['data'].apply(converti_data)
 
-            # Ordina per data
-            df = df.sort_values(by='data')
+            # Teniamo solo righe valide
+            df = df.dropna(subset=['data_parsed'])
 
-            # Dopo l'ordinamento rimetti la data come testo
-            df['data'] = df['data'].dt.strftime('%d %b %Y')
+            # Ordiniamo per la data vera
+            df = df.sort_values(by='data_parsed')
+
+            # Rimettiamo la data nel formato che vuoi
+            df['data'] = df['data_parsed'].dt.strftime('%d %b %Y')
+
+            # Eliminiamo la colonna di servizio
+            df = df.drop(columns=['data_parsed'])
 
         # Scrittura nel primo tab
         first_sheet = all_sheets[0]
         first_sheet.clear()
         first_sheet.update([df.columns.values.tolist()] + df.fillna('').values.tolist())
 
-        print("Dati copiati e ordinati con successo nel primo tab!")
+        print("✅ Dati copiati e ordinati con successo nel primo tab!")
 
     except Exception as e:
-        print(f"Errore: {e}")
+        print(f"❌ Errore: {e}")
 
 if __name__ == "__main__":
     unisci_e_ordina_eventi()
