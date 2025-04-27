@@ -40,10 +40,7 @@ def unisci_e_ordina_eventi():
         # Conversione in DataFrame
         df = pd.DataFrame(all_data)
 
-        # Debug: stampiamo le prime righe per vedere i dati
-        print("Prime righe del DataFrame:")
-        print(df.head())
-
+        # Controlla se esiste la colonna 'data'
         if 'data' in df.columns:
             # Forziamo la colonna 'data' a essere stringa
             df['data'] = df['data'].astype(str)
@@ -54,9 +51,14 @@ def unisci_e_ordina_eventi():
                     # Se la data è nel formato "30 Apr 2025"
                     return datetime.strptime(x.strip(), "%d %b %Y")
                 except ValueError:
-                    print(f"Data non valida: {x}")  # Aggiungiamo un print per vedere i valori errati
-                    return pd.NaT  # Se fallisce, mettiamo "Not a Time"
+                    try:
+                        # Se la data è nel formato "30 Apr" e assumiamo l'anno corrente
+                        return datetime.strptime(x.strip() + " " + str(datetime.now().year), "%d %b %Y")
+                    except ValueError:
+                        print(f"Data non valida: {x}")  # Aggiungiamo un print per vedere i valori errati
+                        return pd.NaT  # Se fallisce, mettiamo "Not a Time"
 
+            # Applichiamo la funzione di conversione alla colonna 'data'
             df['data_parsed'] = df['data'].apply(converti_data)
 
             # Debug: stampiamo i valori dopo la conversione
