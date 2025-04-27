@@ -31,27 +31,37 @@ def unisci_e_ordina_eventi():
         spreadsheet = client.open("Eventi in Friuli")
         all_sheets = spreadsheet.worksheets()
 
-        # Lettura di tutti i dati dai fogli (escluso il primo)
+        # Lettura dei dati dai fogli, ignorando la formattazione
         all_data = []
         for sheet in all_sheets[1:]:
-            records = sheet.get_all_records()
+            records = sheet.get_all_records()  # otteniamo solo i dati, non la formattazione
             all_data.extend(records)
 
         # Conversione in DataFrame
         df = pd.DataFrame(all_data)
 
+        # Debug: stampiamo le prime righe per vedere i dati
+        print("Prime righe del DataFrame:")
+        print(df.head())
+
         if 'data' in df.columns:
             # Forziamo la colonna 'data' a essere stringa
             df['data'] = df['data'].astype(str)
 
-            # Proviamo a convertire tutte le date
+            # Funzione per provare a convertire le date
             def converti_data(x):
                 try:
+                    # Se la data è nel formato "30 Apr 2025"
                     return datetime.strptime(x.strip(), "%d %b %Y")
                 except ValueError:
+                    print(f"Data non valida: {x}")  # Aggiungiamo un print per vedere i valori errati
                     return pd.NaT  # Se fallisce, mettiamo "Not a Time"
 
             df['data_parsed'] = df['data'].apply(converti_data)
+
+            # Debug: stampiamo i valori dopo la conversione
+            print("Valori di 'data_parsed' dopo la conversione:")
+            print(df['data_parsed'].head())
 
             # Teniamo solo righe valide
             df = df.dropna(subset=['data_parsed'])
