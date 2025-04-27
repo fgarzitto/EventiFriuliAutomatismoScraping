@@ -19,13 +19,6 @@ mesi_italiani = {
 # URL di partenza
 url = 'https://www.eventifvg.it/'
 
-def formatta_data_italiana(data_raw):
-    """Converte una data in formato italiano (es. 25 Apr 2025)."""
-    data = datetime.strptime(data_raw, '%Y-%m-%d')
-    mese_inglese = data.strftime('%b')
-    mese_italiano = mesi_italiani.get(mese_inglese, mese_inglese)
-    return data.strftime(f'%d {mese_italiano} %Y')
-
 def estrai_eventi(soup):
     eventi = []
 
@@ -41,16 +34,17 @@ def estrai_eventi(soup):
             titolo = 'Titolo non disponibile'
             link = 'Link non disponibile'
 
-        # Estrazione della data
+        # Estrazione della data come oggetto datetime
         data_elem = evento.find('time', class_='tribe-events-calendar-list__event-date-tag-datetime')
         if data_elem and data_elem.has_attr('datetime'):
             data_raw = data_elem['datetime']
             try:
-                data = formatta_data_italiana(data_raw)
+                # Converti la data in oggetto datetime
+                data = datetime.strptime(data_raw, '%Y-%m-%d')
             except ValueError:
-                data = 'Data non disponibile'
+                data = None
         else:
-            data = 'Data non disponibile'
+            data = None
 
         # Estrazione dell'orario di inizio
         orario_elem = evento.find('time', class_='tribe-events-calendar-list__event-datetime')
@@ -74,7 +68,7 @@ def estrai_eventi(soup):
         # Crea il dizionario dell'evento
         evento_data = {
             'titolo': titolo,
-            'data': data,
+            'data': data,  # Oggetto datetime
             'orario': orario,
             'luogo': luogo,
             'link': link,
@@ -148,15 +142,10 @@ def main():
             break
 
         for evento in eventi_pagina:
-            try:
-                data_evento = datetime.strptime(evento['data'], '%d %b %Y')
-                if data_evento > data_limite:
-                    logging.info(f"Data limite raggiunta: {data_evento}")
-                    url_da_scrapare = None
-                    break
-            except ValueError:
-                logging.warning(f"Data non valida: {evento['data']}")
-                continue
+            if evento['data'] and evento['data'] > data_limite:
+                logging.info(f"Data limite raggiunta: {evento['data']}")
+                url_da_scrapare = None
+                break
 
             eventi_totali.append(evento)
 
@@ -166,7 +155,22 @@ def main():
         time.sleep(2)
 
     if eventi_totali:
-        righe = [[e['titolo'], e['data'], e['orario'], e['luogo'], e['link'], e['categoria']] for e in eventi_totali]
+        # Ordina gli eventi per data
+        eventi_totali.sort(key=lambda e: e['data'] if e['data'] else datetime.max)
+
+        # Prepara i dati per la scrittura su Google Sheets
+        righe = [
+            [
+                e['titolo'],
+                e['data'].strftime("%d %b %Y") if e['data'] else "Data non disponibile",
+                e['orario'],
+                e['luogo'],
+                e['link'],
+                e['categoria']
+            ]
+            for e in eventi_totali
+        ]
+
         try:
             sheet.append_rows(righe)
             logging.info("Dati caricati su Google Sheets.")
