@@ -10,11 +10,14 @@ def unisci_e_ordina_eventi():
         client_email = os.getenv("GSHEET_CLIENT_EMAIL")
         private_key = os.getenv("GSHEET_PRIVATE_KEY")
         
+        if not client_email or not private_key:
+            raise ValueError("Variabili d'ambiente GSHEET_CLIENT_EMAIL o GSHEET_PRIVATE_KEY mancanti.")
+        
         credentials_info = {
             "type": "service_account",
             "project_id": "EventiFriuli",
             "private_key_id": "2ad6e92ed5bd78ebb61505057bc75ecb4130b6a6",
-            "private_key": private_key,
+            "private_key": private_key.replace('\\n', '\n'),  # Gestisce correttamente le newline
             "client_email": client_email,
             "client_id": "103136377669455790448",
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -31,54 +34,64 @@ def unisci_e_ordina_eventi():
         spreadsheet = client.open("Eventi in Friuli")
         all_sheets = spreadsheet.worksheets()
 
+        # Controllo se ci sono fogli disponibili
+        if not all_sheets:
+            raise ValueError("Nessun foglio disponibile nel Google Sheet.")
+
         # Lettura dei dati dai fogli, ignorando la formattazione
         all_data = []
-        for sheet in all_sheets[1:]:
-            records = sheet.get_all_records()  # otteniamo solo i dati, non la formattazione
+        for sheet in all_sheets[1:]:  # Salta il primo foglio, che sarà la destinazione
+            records = sheet.get_all_records()  # Otteniamo solo i dati. La prima riga viene trattata come intestazione
             all_data.extend(records)
+
+        if not all_data:
+            raise ValueError("Nessun dato trovato nei fogli di lavoro.")
 
         # Conversione in DataFrame
         df = pd.DataFrame(all_data)
 
-        # Debug: stampiamo le prime righe per vedere i dati
-        print("Prime righe del DataFrame:")
+        # Debug: stampa delle prime righe per verificare i dati
+        print("Prime righe del DataFrame caricato:")
         print(df.head())
 
         if 'data' in df.columns:
             # Forziamo la colonna 'data' a essere stringa
             df['data'] = df['data'].astype(str)
 
-            # Funzione per provare a convertire le date
+            # Funzione per convertire le date in oggetti datetime
             def converti_data(x):
                 try:
                     # Se la data è nel formato "30 Apr 2025"
                     return datetime.strptime(x.strip(), "%d %b %Y")
                 except ValueError:
-                    print(f"Data non valida: {x}")  # Aggiungiamo un print per vedere i valori errati
+                    print(f"⚠️ Data non valida: {x}")  # Avviso per valori errati
                     return pd.NaT  # Se fallisce, mettiamo "Not a Time"
 
             df['data_parsed'] = df['data'].apply(converti_data)
 
-            # Debug: stampiamo i valori dopo la conversione
+            # Debug: stampa dei risultati della conversione
             print("Valori di 'data_parsed' dopo la conversione:")
-            print(df['data_parsed'].head())
+            print(df[['data', 'data_parsed']].head())
 
-            # Teniamo solo righe valide
+            # Rimuoviamo righe con date non valide
             df = df.dropna(subset=['data_parsed'])
 
-            # Ordiniamo per la data vera
+            # Ordiniamo il DataFrame per data
             df = df.sort_values(by='data_parsed')
 
-            # Rimettiamo la data nel formato che vuoi
+            # Riformattiamo la colonna 'data' in formato desiderato
             df['data'] = df['data_parsed'].dt.strftime('%d %b %Y')
 
-            # Eliminiamo la colonna di servizio
+            # Eliminiamo la colonna temporanea usata per il parsing
             df = df.drop(columns=['data_parsed'])
 
-        # Scrittura nel primo tab
+        else:
+            print("⚠️ Colonna 'data' non trovata. I dati non saranno ordinati per data.")
+
+        # Scrittura nel primo foglio
         first_sheet = all_sheets[0]
-        first_sheet.clear()
-        first_sheet.update([df.columns.values.tolist()] + df.fillna('').values.tolist())
+        first_sheet.clear()  # Cancella i dati esistenti nel foglio
+        first_sheet.update([df.columns.values.tolist()] + df.fillna('').values.tolist())  # Scrive intestazione + dati
 
         print("✅ Dati copiati e ordinati con successo nel primo tab!")
 
