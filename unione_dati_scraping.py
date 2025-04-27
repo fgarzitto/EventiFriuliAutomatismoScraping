@@ -54,9 +54,10 @@ def unisci_e_ordina_eventi():
         print("Prime righe del DataFrame caricato:")
         print(df.head())
 
-        if 'data' in df.columns:
-            # Forziamo la colonna 'data' a essere stringa
-            df['data'] = df['data'].astype(str)
+        # Controlla se la colonna "Data" esiste nel DataFrame
+        if 'Data' in df.columns:
+            # Forziamo la colonna 'Data' a essere stringa
+            df['Data'] = df['Data'].astype(str)
 
             # Funzione per convertire le date in oggetti datetime
             def converti_data(x):
@@ -67,26 +68,27 @@ def unisci_e_ordina_eventi():
                     print(f"⚠️ Data non valida: {x}")  # Avviso per valori errati
                     return pd.NaT  # Se fallisce, mettiamo "Not a Time"
 
-            df['data_parsed'] = df['data'].apply(converti_data)
+            # Applica la conversione alla colonna 'Data'
+            df['Data_parsed'] = df['Data'].apply(converti_data)
 
             # Debug: stampa dei risultati della conversione
-            print("Valori di 'data_parsed' dopo la conversione:")
-            print(df[['data', 'data_parsed']].head())
+            print("Valori di 'Data_parsed' dopo la conversione:")
+            print(df[['Data', 'Data_parsed']].head())
 
             # Rimuoviamo righe con date non valide
-            df = df.dropna(subset=['data_parsed'])
+            df = df.dropna(subset=['Data_parsed'])
 
             # Ordiniamo il DataFrame per data
-            df = df.sort_values(by='data_parsed')
+            df = df.sort_values(by='Data_parsed')
 
-            # Riformattiamo la colonna 'data' in formato desiderato
-            df['data'] = df['data_parsed'].dt.strftime('%d %b %Y')
+            # Riformattiamo la colonna 'Data' in formato desiderato
+            df['Data'] = df['Data_parsed'].dt.strftime('%d %b %Y')
 
             # Eliminiamo la colonna temporanea usata per il parsing
-            df = df.drop(columns=['data_parsed'])
+            df = df.drop(columns=['Data_parsed'])
 
         else:
-            print("⚠️ Colonna 'data' non trovata. I dati non saranno ordinati per data.")
+            print("⚠️ Colonna 'Data' non trovata. I dati non saranno ordinati per data.")
 
         # Scrittura nel primo foglio
         first_sheet = all_sheets[0]
