@@ -128,7 +128,18 @@ def unisci_e_ordina_eventi():
         # Rimuoviamo righe duplicate con lo stesso titolo e la stessa data
         if 'Titolo' in df.columns and 'Data' in df.columns:
             # Standardizza i dati per evitare problemi con maiuscole/minuscole o spazi
-            df['Titolo'] = df['Titolo'].str.strip().str.lower()
+            # Crea una copia temporanea in minuscolo per confronto
+            df['Titolo_lower'] = df['Titolo'].str.strip().str.lower()
+            
+            # Rimuove i duplicati usando la versione minuscola
+            df = df.drop_duplicates(subset=['Titolo_lower', 'Data'], keep='first')
+            
+            # Ripristina Titolo con prima lettera maiuscola
+            df['Titolo'] = df['Titolo'].str.strip().str.title()
+            
+            # Rimuove la colonna temporanea
+            df = df.drop(columns=['Titolo_lower'])
+
             df['Data'] = df['Data'].str.strip()
 
             # Debug: identificare duplicati prima della rimozione
