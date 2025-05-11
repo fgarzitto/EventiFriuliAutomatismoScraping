@@ -33,13 +33,10 @@ def traduci_data(data_str):
 def converti_data(data_str):
     """Converte una data stringa nel formato richiesto."""
     try:
-        # Traduce il mese italiano
         data_str = traduci_data(data_str)
-        # Prova a convertire nel formato numerico "dd mm yyyy"
         try:
             return datetime.strptime(data_str.strip(), "%d %m %Y")
         except ValueError:
-            # Se fallisce, prova con il formato "dd Mmm yyyy" (abbreviazioni inglesi)
             return datetime.strptime(data_str.strip(), "%d %b %Y")
     except ValueError:
         print(f"⚠️ Data non valida: {data_str}")
@@ -47,7 +44,6 @@ def converti_data(data_str):
 
 def unisci_e_ordina_eventi():
     try:
-        # Autenticazione tramite variabili d'ambiente
         client_email = os.getenv("GSHEET_CLIENT_EMAIL")
         private_key = os.getenv("GSHEET_PRIVATE_KEY")
         
@@ -58,7 +54,7 @@ def unisci_e_ordina_eventi():
             "type": "service_account",
             "project_id": "EventiFriuli",
             "private_key_id": "2ad6e92ed5bd78ebb61505057bc75ecb4130b6a6",
-            "private_key": private_key.replace('\\n', '\n'),  # Gestisce correttamente le newline
+            "private_key": private_key.replace('\\n', '\n'),
             "client_email": client_email,
             "client_id": "103136377669455790448",
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -71,93 +67,60 @@ def unisci_e_ordina_eventi():
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
         client = gspread.authorize(credentials)
 
-        # Apertura del Google Sheet
         spreadsheet = client.open("Eventi in Friuli")
         all_sheets = spreadsheet.worksheets()
 
-        # Controllo se ci sono fogli disponibili
         if not all_sheets:
             raise ValueError("Nessun foglio disponibile nel Google Sheet.")
 
-        # Lettura dei dati dai fogli, ignorando la formattazione
         all_data = []
-        for sheet in all_sheets[1:]:  # Salta il primo foglio, che sarà la destinazione
-            records = sheet.get_all_records()  # Otteniamo solo i dati. La prima riga viene trattata come intestazione
+        for sheet in all_sheets[1:]:  # Salta il primo foglio
+            records = sheet.get_all_records()
             all_data.extend(records)
 
         if not all_data:
             raise ValueError("Nessun dato trovato nei fogli di lavoro.")
 
-        # Conversione in DataFrame
         df = pd.DataFrame(all_data)
 
-        # Debug: stampa delle prime righe per verificare i dati
         print("Prime righe del DataFrame caricato:")
         print(df.head())
 
-        # Controlla se la colonna "Data" esiste nel DataFrame
         if 'Data' in df.columns:
-            # Forziamo la colonna 'Data' a essere stringa
             df['Data'] = df['Data'].astype(str)
-
-            # Applica la conversione delle date
             df['Data_parsed'] = df['Data'].apply(converti_data)
-
-            # Debug: stampa dei risultati della conversione
             print("Valori di 'Data_parsed' dopo la conversione:")
             print(df[['Data', 'Data_parsed']].head())
 
-            # Rimuoviamo righe con date non valide
             df = df.dropna(subset=['Data_parsed'])
-
-            # Ordiniamo il DataFrame per data
             df = df.sort_values(by='Data_parsed')
-
-            # Riformattiamo la colonna 'Data' in formato desiderato
             df['Data'] = df['Data_parsed'].dt.strftime('%d %b %Y')
-
-            # Traduci i mesi inglesi abbreviati in italiano
             df['Data'] = df['Data'].apply(traduci_mese_in_italiano)
-
-            # Eliminiamo la colonna temporanea usata per il parsing
             df = df.drop(columns=['Data_parsed'])
-
         else:
             print("⚠️ Colonna 'Data' non trovata. I dati non saranno ordinati per data.")
 
-        # Rimuoviamo righe duplicate con lo stesso titolo e la stessa data
+        # 🔁 Rimozione duplicati prima della scrittura
         if 'Titolo' in df.columns and 'Data' in df.columns:
-            # Standardizza i dati per evitare problemi con maiuscole/minuscole o spazi
-            # Crea una copia temporanea in minuscolo per confronto
-            df['Titolo_lower'] = df['Titolo'].str.strip().str.lower()
-            
-            # Rimuove i duplicati usando la versione minuscola
-            df = df.drop_duplicates(subset=['Titolo_lower', 'Data'], keep='first')
-            
-            # Ripristina Titolo con prima lettera maiuscola
-            df['Titolo'] = df['Titolo'].str.strip().str.title()
-            
-            # Rimuove la colonna temporanea
-            df = df.drop(columns=['Titolo_lower'])
+            df['Titolo_normalizzato'] = df['Titolo'].astype(str).str.strip().str.lower()
+            df['Data_normalizzata'] = df['Data'].astype(str).str.strip()
 
-            df['Data'] = df['Data'].str.strip()
-
-            # Debug: identificare duplicati prima della rimozione
-            duplicati = df[df.duplicated(subset=['Titolo', 'Data'], keep=False)]
+            duplicati = df[df.duplicated(subset=['Titolo_normalizzato', 'Data_normalizzata'], keep=False)]
             if not duplicati.empty:
                 print("⚠️ Righe duplicate trovate:")
-                print(duplicati)
+                print(duplicati[['Titolo', 'Data']])
 
-            # Rimuove duplicati e mantiene solo la prima occorrenza
-            df = df.drop_duplicates(subset=['Titolo', 'Data'], keep='first')
+            df = df.drop_duplicates(subset=['Titolo_normalizzato', 'Data_normalizzata'], keep='first')
+            df = df.drop(columns=['Titolo_normalizzato', 'Data_normalizzata'])
+
             print("✅ Eventi duplicati rimossi con successo.")
         else:
             print("⚠️ Colonne 'Titolo' o 'Data' mancanti. Non è stato possibile rimuovere i duplicati.")
 
-        # Scrittura nel primo foglio
+        # ✍️ Scrittura nel primo foglio
         first_sheet = all_sheets[0]
-        first_sheet.clear()  # Cancella i dati esistenti nel foglio
-        first_sheet.update([df.columns.values.tolist()] + df.fillna('').values.tolist())  # Scrive intestazione + dati
+        first_sheet.clear()
+        first_sheet.update([df.columns.values.tolist()] + df.fillna('').values.tolist())
 
         print("✅ Dati copiati e ordinati con successo nel primo tab!")
 
