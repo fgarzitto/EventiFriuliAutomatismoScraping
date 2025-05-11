@@ -152,4 +152,3 @@ def unisci_e_ordina_eventi():
 
 if __name__ == "__main__":
     unisci_e_ordina_eventi()
-```
