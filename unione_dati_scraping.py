@@ -1,6 +1,3 @@
-Ecco il codice con le indentazioni corrette:
-
-```python
 import os
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
