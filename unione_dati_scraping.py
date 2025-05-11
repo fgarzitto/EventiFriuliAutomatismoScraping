@@ -126,11 +126,11 @@ def unisci_e_ordina_eventi():
             print("⚠️ Colonna 'Data' non trovata. I dati non saranno ordinati per data.")
 
        # Rimuoviamo righe duplicate con lo stesso titolo e la stessa data
-if 'Titolo' in df.columns and 'Data' in df.columns:
-    df = df.drop_duplicates(subset=['Titolo', 'Data'], keep='first')
-    print("✅ Eventi duplicati rimossi con successo.")
-else:
-    print("⚠️ Colonne 'Titolo' o 'Data' mancanti. Non è stato possibile rimuovere i duplicati.")
+        if 'Titolo' in df.columns and 'Data' in df.columns:
+            df = df.drop_duplicates(subset=['Titolo', 'Data'], keep='first')
+            print("✅ Eventi duplicati rimossi con successo.")
+        else:
+            print("⚠️ Colonne 'Titolo' o 'Data' mancanti. Non è stato possibile rimuovere i duplicati.")
 
 # Scrittura nel primo foglio
 first_sheet = all_sheets[0]
