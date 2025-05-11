@@ -150,5 +150,8 @@ def unisci_e_ordina_eventi():
         else:
             print("⚠️ Colonne 'Titolo' o 'Data' mancanti. Non è stato possibile rimuovere i duplicati.")
 
+    except Exception as e:
+        print(f"Errore durante l'esecuzione: {e}")
+
 if __name__ == "__main__":
     unisci_e_ordina_eventi()
