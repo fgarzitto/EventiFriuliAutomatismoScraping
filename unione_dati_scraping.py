@@ -134,13 +134,21 @@ def unisci_e_ordina_eventi():
 
         # Rimuoviamo righe duplicate con lo stesso titolo e la stessa data
         if 'Titolo' in df.columns and 'Data' in df.columns:
-            df = df.drop_duplicates(subset=['Titolo', 'Data'], keep='first')
+            # Standardizza i dati per evitare problemi con maiuscole/minuscole o spazi
+            df['Titolo'] = df['Titolo'].str.strip().str.lower()
+            df['Data'] = df['Data'].str.strip()
+
+        # Debug: identificare duplicati prima della rimozione
+        duplicati = df[df.duplicated(subset=['Titolo', 'Data'], keep=False)]
+        if not duplicati.empty:
+            print("⚠️ Righe duplicate trovate:")
+            print(duplicati)
+
+        # Rimuove duplicati e mantiene solo la prima occorrenza
+        df = df.drop_duplicates(subset=['Titolo', 'Data'], keep='first')
             print("✅ Eventi duplicati rimossi con successo.")
         else:
             print("⚠️ Colonne 'Titolo' o 'Data' mancanti. Non è stato possibile rimuovere i duplicati.")
-
-    except Exception as e:
-        print(f"❌ Errore: {e}")
 
 if __name__ == "__main__":
     unisci_e_ordina_eventi()
