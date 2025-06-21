@@ -25,19 +25,16 @@ def estrai_eventi(soup):
     }
 
     for evento in soup.find_all('div', class_='col-date col-lg-6 col-sm-12 texts'):
-        titolo_elem = evento.find('h4')
-        titolo = titolo_elem.text.strip() if titolo_elem else 'Titolo non disponibile'
-
+        # Trova il tag <a> che contiene <h4> con href all'evento
         link = 'Link non disponibile'
-        link_elem = evento.find('a', class_='pic', href=True)
-        if link_elem:
-            link = link_elem.get('href', 'Link non disponibile')
-            if link.startswith('/'):
-                link = f"https://www.itinerarinellarte.it{link}"
-        else:
-            titolo_link_elem = evento.find('a', title=True, href=True)
-            if titolo_link_elem:
-                link = titolo_link_elem.get('href', 'Link non disponibile')
+        titolo = 'Titolo non disponibile'
+
+        a_tag = evento.find(lambda tag: tag.name == "a" and tag.find("h4") and tag.has_attr("href"))
+        if a_tag:
+            h4_tag = a_tag.find("h4")
+            if h4_tag:
+                titolo = h4_tag.text.strip()
+                link = a_tag['href']
                 if link.startswith('/'):
                     link = f"https://www.itinerarinellarte.it{link}"
 
