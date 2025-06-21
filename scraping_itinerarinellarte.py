@@ -25,9 +25,9 @@ def estrai_eventi(soup):
     }
 
     for evento in soup.find_all('div', class_='col-date col-lg-6 col-sm-12 texts'):
-    # Inizializza i valori predefiniti
-    titolo = 'Titolo non disponibile'
-    link = 'Link non disponibile'
+        # Inizializza i valori predefiniti
+        titolo = 'Titolo non disponibile'
+        link = 'Link non disponibile'
 
     # Trova il <a> che contiene <h4>
     link_elem = evento.find('a', href=True)
