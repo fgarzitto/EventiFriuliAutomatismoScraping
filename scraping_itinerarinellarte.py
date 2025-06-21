@@ -31,8 +31,8 @@ def estrai_eventi(soup):
             link = link_elem['href']
         if link.startswith('/'):
             link = f"https://www.itinerarinellarte.it{link}"
-                titolo_elem = link_elem.find('h4')
-                titolo = titolo_elem.text.strip() if titolo_elem else 'Titolo non disponibile'
+            titolo_elem = link_elem.find('h4')
+            titolo = titolo_elem.text.strip() if titolo_elem else 'Titolo non disponibile'
         else:
             link = 'Link non disponibile'
             titolo = 'Titolo non disponibile'
