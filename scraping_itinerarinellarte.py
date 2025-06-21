@@ -14,6 +14,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # URL di partenza
 url = 'https://www.itinerarinellarte.it/it/mostre/friuli-venezia-giulia'
 
+BASE_URL = 'https://www.itinerarinellarte.it/'
+
 def estrai_eventi(soup):
     eventi = []
     oggi = datetime.now()
