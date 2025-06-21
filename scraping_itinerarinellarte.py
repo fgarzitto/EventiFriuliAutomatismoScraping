@@ -25,21 +25,26 @@ def estrai_eventi(soup):
     }
 
     for evento in soup.find_all('div', class_='col-date col-lg-6 col-sm-12 texts'):
-        titolo_elem = evento.find('h4')
-        titolo = titolo_elem.text.strip() if titolo_elem else 'Titolo non disponibile'
+    titolo_elem = evento.find('h4')
+    titolo = titolo_elem.text.strip() if titolo_elem else 'Titolo non disponibile'
 
-        link = 'Link non disponibile'
+    link = 'Link non disponibile'
+    # Cerca l'<a> che contiene l'<h4> (cioè il link all'evento)
+    h4_a_elem = evento.find('a', href=True)
+    if h4_a_elem and h4_a_elem.find('h4'):
+        href = h4_a_elem.get('href', '')
+        link = urljoin(BASE_URL, href) if href else 'Link non disponibile'
+    else:
+        # Fallback ai vecchi metodi se non trova il link principale
         link_elem = evento.find('a', class_='pic', href=True)
         if link_elem:
-            link = link_elem.get('href', 'Link non disponibile')
-            if link.startswith('/'):
-                link = f"https://www.itinerarinellarte.it{link}"
+            href = link_elem.get('href', '')
+            link = urljoin(BASE_URL, href) if href else 'Link non disponibile'
         else:
             titolo_link_elem = evento.find('a', title=True, href=True)
             if titolo_link_elem:
-                link = titolo_link_elem.get('href', 'Link non disponibile')
-                if link.startswith('/'):
-                    link = f"https://www.itinerarinellarte.it{link}"
+                href = titolo_link_elem.get('href', '')
+                link = urljoin(BASE_URL, href) if href else 'Link non disponibile'
 
         luogo = 'Luogo non disponibile'
         luogo_elem = evento.find('h3')
