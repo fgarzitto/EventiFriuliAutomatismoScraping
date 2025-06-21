@@ -29,9 +29,9 @@ def estrai_eventi(soup):
         link = 'Link non disponibile'
         titolo = 'Titolo non disponibile'
 
-        a_tag = evento.find('a', href=True)
+        a_tag = evento.find(lambda tag: tag.name == "a" and tag.find("h4") and tag.has_attr("href"))
         if a_tag:
-            h4_tag = a_tag.find('h4')
+            h4_tag = a_tag.find("h4")
             if h4_tag:
                 titolo = h4_tag.text.strip()
                 link = a_tag['href']
