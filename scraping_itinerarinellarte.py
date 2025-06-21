@@ -6,15 +6,12 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import time
 import logging
-from urllib.parse import urljoin
 
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # URL di partenza
 url = 'https://www.itinerarinellarte.it/it/mostre/friuli-venezia-giulia'
-
-BASE_URL = 'https://www.itinerarinellarte.it/'
 
 def estrai_eventi(soup):
     eventi = []
@@ -31,23 +28,18 @@ def estrai_eventi(soup):
         titolo_elem = evento.find('h4')
         titolo = titolo_elem.text.strip() if titolo_elem else 'Titolo non disponibile'
 
-    link = 'Link non disponibile'
-    # Cerca l'<a> che contiene l'<h4> (cioè il link all'evento)
-    h4_a_elem = evento.find('a', href=True)
-    if h4_a_elem and h4_a_elem.find('h4'):
-        href = h4_a_elem.get('href', '')
-        link = urljoin(BASE_URL, href) if href else 'Link non disponibile'
-    else:
-        # Fallback ai vecchi metodi se non trova il link principale
+        link = 'Link non disponibile'
         link_elem = evento.find('a', class_='pic', href=True)
         if link_elem:
-            href = link_elem.get('href', '')
-            link = urljoin(BASE_URL, href) if href else 'Link non disponibile'
+            link = link_elem.get('href', 'Link non disponibile')
+            if link.startswith('/'):
+                link = f"https://www.itinerarinellarte.it{link}"
         else:
             titolo_link_elem = evento.find('a', title=True, href=True)
             if titolo_link_elem:
-                href = titolo_link_elem.get('href', '')
-                link = urljoin(BASE_URL, href) if href else 'Link non disponibile'
+                link = titolo_link_elem.get('href', 'Link non disponibile')
+                if link.startswith('/'):
+                    link = f"https://www.itinerarinellarte.it{link}"
 
         luogo = 'Luogo non disponibile'
         luogo_elem = evento.find('h3')
