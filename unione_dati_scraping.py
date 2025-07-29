@@ -8,36 +8,50 @@ from datetime import datetime
 mesi_italiani = {
     "gennaio": "01", "febbraio": "02", "marzo": "03", "aprile": "04", "maggio": "05", "giugno": "06",
     "luglio": "07", "agosto": "08", "settembre": "09", "ottobre": "10", "novembre": "11", "dicembre": "12",
-    "gen": "Jan", "feb": "Feb", "mar": "Mar", "apr": "Apr", "mag": "May", "giu": "Jun",
-    "lug": "Jul", "ago": "Ago", "set": "Sep", "ott": "Oct", "nov": "Nov", "dic": "Dec"
+    "gen": "01", "feb": "02", "mar": "03", "apr": "04", "mag": "05", "giu": "06",
+    "lug": "07", "ago": "08", "set": "09", "ott": "10", "nov": "11", "dic": "12"
 }
 
-# Mappa per tradurre i mesi abbreviati inglesi in italiano
+# Mappa per tradurre i mesi inglesi abbreviati in italiano
 mesi_abbreviati_ita = {
     "Jan": "Gen", "Feb": "Feb", "Mar": "Mar", "Apr": "Apr", "May": "Mag", "Jun": "Giu",
     "Jul": "Lug", "Aug": "Ago", "Sep": "Set", "Oct": "Ott", "Nov": "Nov", "Dec": "Dic"
 }
 
+# Mappa per tradurre abbreviazioni italiane in inglese
+mesi_italiani_abbr = {
+    "gen": "Jan", "feb": "Feb", "mar": "Mar", "apr": "Apr", "mag": "May", "giu": "Jun",
+    "lug": "Jul", "ago": "Aug", "set": "Sep", "ott": "Oct", "nov": "Nov", "dic": "Dec"
+}
+
 def traduci_mese_in_italiano(data_str):
-    """Sostituisce i mesi inglesi abbreviati con quelli in italiano."""
     for mese_eng, mese_ita in mesi_abbreviati_ita.items():
         data_str = data_str.replace(mese_eng, mese_ita)
     return data_str
 
 def traduci_data(data_str):
-    """Sostituisce i mesi italiani (completi o abbreviati) con quelli in formato numerico o inglese."""
     for mese, sostituto in mesi_italiani.items():
         data_str = data_str.lower().replace(mese, sostituto)
     return data_str
 
+def italiano_to_inglese_abbr(data_str):
+    for mese_ita, mese_eng in mesi_italiani_abbr.items():
+        data_str = data_str.lower().replace(mese_ita, mese_eng)
+    return data_str
+
 def converti_data(data_str):
-    """Converte una data stringa nel formato richiesto."""
     try:
-        data_str = traduci_data(data_str)
+        # Prova formato numerico (es. "03 08 2025")
+        data_str_numerica = traduci_data(data_str)
         try:
-            return datetime.strptime(data_str.strip(), "%d %m %Y")
+            return datetime.strptime(data_str_numerica.strip(), "%d %m %Y")
         except ValueError:
-            return datetime.strptime(data_str.strip(), "%d %b %Y")
+            pass
+
+        # Prova formato testuale inglese abbreviato (es. "03 Aug 2025")
+        data_str_eng = italiano_to_inglese_abbr(data_str)
+        return datetime.strptime(data_str_eng.strip().title(), "%d %b %Y")
+
     except ValueError:
         print(f"⚠️ Data non valida: {data_str}")
         return pd.NaT
@@ -89,8 +103,11 @@ def unisci_e_ordina_eventi():
         if 'Data' in df.columns:
             df['Data'] = df['Data'].astype(str)
             df['Data_parsed'] = df['Data'].apply(converti_data)
-            print("Valori di 'Data_parsed' dopo la conversione:")
-            print(df[['Data', 'Data_parsed']].head())
+
+            non_parse = df[df['Data_parsed'].isna()]
+            if not non_parse.empty:
+                print("⛔️ Date non parseabili:")
+                print(non_parse[['Data']])
 
             df = df.dropna(subset=['Data_parsed'])
             df = df.sort_values(by='Data_parsed')
@@ -100,7 +117,6 @@ def unisci_e_ordina_eventi():
         else:
             print("⚠️ Colonna 'Data' non trovata. I dati non saranno ordinati per data.")
 
-        # 🔁 Rimozione duplicati prima della scrittura
         if 'Titolo' in df.columns and 'Data' in df.columns:
             df['Titolo_normalizzato'] = df['Titolo'].astype(str).str.strip().str.lower()
             df['Data_normalizzata'] = df['Data'].astype(str).str.strip()
@@ -117,7 +133,6 @@ def unisci_e_ordina_eventi():
         else:
             print("⚠️ Colonne 'Titolo' o 'Data' mancanti. Non è stato possibile rimuovere i duplicati.")
 
-        # ✍️ Scrittura nel primo foglio
         first_sheet = all_sheets[0]
         first_sheet.clear()
         first_sheet.update([df.columns.values.tolist()] + df.fillna('').values.tolist())
