@@ -129,7 +129,6 @@ def estrai_eventi(soup):
             eventi.append(crea_evento(e, titolo, data, is_big))
 
     eventi.sort(key=lambda e: parse_data_sicura(e['data']))
-    logging.info(f"{len(eventi)} eventi estratti")  # Log di quanti eventi sono stati estratti
     return eventi
 
 def main():
@@ -155,7 +154,6 @@ def main():
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
         client = gspread.authorize(credentials)
         sheet = client.open("Eventi in Friuli").worksheet("TurismoFvg")
-        logging.info("Connessione a Google Sheets riuscita.")
     except Exception as e:
         logging.error(f"Errore accesso Google Sheets: {e}")
         return
@@ -164,7 +162,6 @@ def main():
         num_rows = len(sheet.get_all_values())
         if num_rows > 1:
             sheet.delete_rows(2, num_rows)
-            logging.info(f"Pulizia del foglio completata. Righe eliminate: {num_rows - 1}")
     except Exception as e:
         logging.error(f"Errore pulizia foglio: {e}")
 
@@ -174,7 +171,7 @@ def main():
         url_page = url if page == 0 else f"{url}?page={page}"
 
         try:
-            r = requests.get(url_page, headers={'User-Agent': 'Mozilla/5.0'})
+            r = requests.get(url_page, headers={'User-Agent': 'Mozilla/5.0'}, verify=False)  # Disabilita la verifica SSL
             r.raise_for_status()
         except Exception as e:
             logging.error(f"Errore richiesta pagina {page}: {e}")
@@ -183,7 +180,6 @@ def main():
         soup = BeautifulSoup(r.content, 'html.parser')
         eventi = estrai_eventi(soup)
         if not eventi:
-            logging.info(f"Nessun evento trovato nella pagina {page}.")
             break
 
         eventi_totali.extend(eventi)
@@ -198,6 +194,6 @@ def main():
             logging.error(f"Errore scrittura su Google Sheets: {e}")
     else:
         logging.info("Nessun evento da caricare.")
-    
+
 if __name__ == '__main__':
     main()
