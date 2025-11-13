@@ -13,119 +13,127 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 url = 'https://www.turismofvg.it/eventi'
 
-# Funzioni di parsing per i vari tipi di eventi
+# Funzioni di parsing
 
-def estrai_evento_principale(evento):
-    # Estrai il titolo dell'evento principale
-    titolo_elem = evento.find('h2', class_='c-events_showreel__title')
-    titolo = titolo_elem.text.strip() if titolo_elem else 'Titolo non disponibile'
+def estrai_dati_evento_grande(evento):
+    data_elem = evento.find('div', class_='col1')
+    if data_elem:
+        giorno = data_elem.find('strong')
+        mese = data_elem.find('p')
+        if giorno and mese:
+            data_str = f"{giorno.text.strip()} {mese.text.strip()} {datetime.now().year}"
+            data = dateparser.parse(data_str, settings={'DATE_ORDER': 'DMY'}, languages=['it'])
+            return data.strftime('%d %b %Y') if data else 'Data non disponibile'
+    return 'Data non disponibile'
 
-    # Estrai la data
-    data_elem = evento.find('h3')
-    data = data_elem.text.strip() if data_elem else 'Data non disponibile'
+def estrai_dati_evento_piccolo(evento):
+    return estrai_dati_evento_grande(evento)
 
-    # Estrai il luogo
-    luogo_elem = evento.find('h4')
-    luogo = luogo_elem.text.strip() if luogo_elem else 'Luogo non disponibile'
+def estrai_dati_evento_periodo(evento):
+    data_elem = evento.find('span', class_='multiple_days_string')
+    if data_elem:
+        testo = data_elem.text.strip().lower()
+        if 'dal' in testo and 'al' in testo:
+            try:
+                testo = testo.replace('dal', '').strip()
+                if ' al ' in testo:
+                    inizio, fine = testo.split(' al ')
+                    inizio = inizio.strip()
+                    fine = fine.strip()
+                    if not any(str(y) in inizio for y in range(2020, 2031)):
+                        inizio += f" {datetime.now().year}"
+                    if not any(str(y) in fine for y in range(2020, 2031)):
+                        fine += f" {datetime.now().year}"
+                    data_inizio = dateparser.parse(inizio, settings={'DATE_ORDER': 'DMY'}, languages=['it'])
+                    data_fine = dateparser.parse(fine, settings={'DATE_ORDER': 'DMY'}, languages=['it'])
+                    if data_inizio and data_fine:
+                        return f"{data_inizio.strftime('%d %b %Y')} - {data_fine.strftime('%d %b %Y')}"
+            except Exception as e:
+                logging.error(f"Errore parsing periodo: {e}")
+    return 'Data non disponibile'
 
-    # Estrai il link
-    link_elem = evento.find('a', class_='c-events_showreel__link')
-    link = 'https://www.turismofvg.it' + link_elem['href'] if link_elem else 'Link non disponibile'
+def estrai_luogo(evento, is_big):
+    if is_big:
+        luogo_elem = evento.find('div', class_='info_rows info_location')
+        return luogo_elem.find('strong', class_='col2').text.strip() if luogo_elem else 'Luogo non disponibile'
+    else:
+        col2 = evento.find('div', class_='col2')
+        return col2.find('strong').text.strip() if col2 and col2.find('strong') else 'Luogo non disponibile'
+
+def estrai_categoria(evento, is_big):
+    if is_big:
+        cat = evento.find('div', class_='info_rows info_category')
+        return cat.find('strong', class_='col2').text.strip() if cat else 'Categoria non disponibile'
+    else:
+        col3 = evento.find('div', class_='col3')
+        return col3.get("title", "Categoria non disponibile") if col3 else 'Categoria non disponibile'
+
+def crea_evento(evento, titolo, data, is_big):
+    try:
+        data_parsed = dateparser.parse(data, settings={'DATE_ORDER': 'DMY'}, languages=['it'])
+        if data_parsed:
+            data = data_parsed.strftime('%d %b %Y')
+    except Exception as e:
+        logging.warning(f"Errore parsing data evento: {data}, {e}")
+
+    luogo = estrai_luogo(evento, is_big)
+    ora = evento.find('div', class_='c-bigEvent__time')
+    ora_txt = ora.text.strip() if ora and is_big else 'Ora non disponibile'
+    categoria = estrai_categoria(evento, is_big)
+    link = 'https://www.turismofvg.it' + evento['href'] if evento.get('href') else 'Link non disponibile'
 
     return {
-        'titolo': titolo,
+        'titolo': titolo.strip(),
         'data': data,
         'luogo': luogo,
+        'ora': ora_txt,
         'link': link,
-        'categoria': 'Categoria non disponibile',
-        'tipo': 'principale'
-    }
-
-def estrai_evento_secondo_tipo(evento):
-    # Estrai la data
-    data_elem = evento.find('div', class_='info_rows info_date')
-    if data_elem:
-        giorno = data_elem.find('strong').text.strip() if data_elem.find('strong') else 'Giorno non disponibile'
-        mese = data_elem.find('p').text.strip() if data_elem.find('p') else 'Mese non disponibile'
-        data = f"{giorno} {mese}"  # Data in formato "13 NOV"
-    else:
-        data = 'Data non disponibile'
-
-    # Estrai il luogo
-    luogo_elem = evento.find('div', class_='info_rows info_location')
-    luogo = luogo_elem.find('strong', class_='col2').text.strip() if luogo_elem else 'Luogo non disponibile'
-
-    # Estrai la categoria
-    categoria_elem = evento.find('div', class_='info_rows info_category')
-    categoria = categoria_elem.get('title', 'Categoria non disponibile') if categoria_elem else 'Categoria non disponibile'
-
-    # Estrai il titolo
-    titolo_elem = evento.find('h1', class_='title')
-    titolo = titolo_elem.text.strip() if titolo_elem else 'Titolo non disponibile'
-
-    return {
-        'titolo': titolo,
-        'data': data,
-        'luogo': luogo,
         'categoria': categoria,
-        'link': 'https://www.turismofvg.it' + evento.find('a')['href'] if evento.find('a') else 'Link non disponibile',
-        'tipo': 'secondo_tipo'
+        'tipo': 'big' if is_big else 'small'
     }
 
-def estrai_evento_terzo_tipo(evento):
-    # Estrai il titolo
-    titolo_elem = evento.find('h2', class_='title')
-    titolo = titolo_elem.text.strip() if titolo_elem else 'Titolo non disponibile'
+def parse_data_sicura(data_str):
+    parsed = dateparser.parse(data_str, settings={'DATE_ORDER': 'DMY'}, languages=['it'])
+    if not parsed:
+        logging.warning(f"Data non parsata correttamente: {data_str}")
+    return parsed or datetime.max
 
-    # Estrai la data (giorno e mese)
-    data_elem = evento.find('div', class_='info_rows info_date')
-    if data_elem:
-        giorno = data_elem.find('strong').text.strip() if data_elem.find('strong') else 'Giorno non disponibile'
-        mese = data_elem.find('p').text.strip() if data_elem.find('p') else 'Mese non disponibile'
-        data = f"{giorno} {mese}"  # Data in formato "13 NOV"
-    else:
-        data = 'Data non disponibile'
-
-    # Estrai il luogo
-    luogo_elem = evento.find('div', class_='info_rows info_location')
-    luogo = luogo_elem.find('strong', class_='col2').text.strip() if luogo_elem else 'Luogo non disponibile'
-
-    # Estrai la categoria
-    categoria_elem = evento.find('div', class_='info_rows info_category')
-    categoria = categoria_elem.get('title', 'Categoria non disponibile') if categoria_elem else 'Categoria non disponibile'
-
-    return {
-        'titolo': titolo,
-        'data': data,
-        'luogo': luogo,
-        'categoria': categoria,
-        'link': 'https://www.turismofvg.it' + evento.find('a')['href'] if evento.find('a') else 'Link non disponibile',
-        'tipo': 'terzo_tipo'
-    }
-
-# Funzione per estrarre eventi da tutti i tipi
-def estrai_eventi_completi(soup):
+def estrai_eventi(soup):
     eventi = []
+    oggi = datetime.now()
+    limite = oggi + timedelta(days=7)
 
-    # Estrai gli eventi principali
-    evento_principale = soup.find_all('div', class_='c-events_showreel__info')
-    for evento in evento_principale:
-        eventi.append(estrai_evento_principale(evento))
+    for e in soup.find_all('a', class_='c-eventsResults__item'):
+        is_big = e.find('h1', class_='title') is not None
+        has_periodo = e.find('span', class_='multiple_days_string') is not None
 
-    # Estrai il secondo tipo di eventi
-    eventi_secondo_tipo = soup.find_all('div', class_='item_info')
-    for evento in eventi_secondo_tipo:
-        eventi.append(estrai_evento_secondo_tipo(evento))
+        titolo = e.find('h1', class_='title').text if is_big else e.find('h2', class_='title').text
+        titolo = titolo.strip()
 
-    # Estrai il terzo tipo di eventi
-    for evento in eventi_secondo_tipo:
-        eventi.append(estrai_evento_terzo_tipo(evento))
+        if has_periodo:
+            periodo = estrai_dati_evento_periodo(e)
+            if periodo != 'Data non disponibile':
+                try:
+                    inizio_str, fine_str = periodo.split(" - ")
+                    inizio = datetime.strptime(inizio_str, '%d %b %Y')
+                    fine = datetime.strptime(fine_str, '%d %b %Y')
+                    inizio = max(inizio, oggi)
+                    fine = min(fine, limite)
+                    for i in range((fine - inizio).days + 1):
+                        d = inizio + timedelta(days=i)
+                        eventi.append(crea_evento(e, titolo, d.strftime('%d %b %Y'), is_big))
+                except Exception as e:
+                    logging.warning(f"Errore gestione periodo: {e}")
+        else:
+            data = estrai_dati_evento_grande(e) if is_big else estrai_dati_evento_piccolo(e)
+            eventi.append(crea_evento(e, titolo, data, is_big))
 
+    eventi.sort(key=lambda e: parse_data_sicura(e['data']))
+    logging.info(f"{len(eventi)} eventi estratti")  # Log di quanti eventi sono stati estratti
     return eventi
 
-# Funzione principale per eseguire lo scraping e caricare i dati su Google Sheets
 def main():
-    # Autenticazione con Google Sheets
+    # Autenticazione con Google Sheets utilizzando variabili d'ambiente
     try:
         client_email = os.getenv("GSHEET_CLIENT_EMAIL")
         private_key = os.getenv("GSHEET_PRIVATE_KEY")
@@ -147,6 +155,7 @@ def main():
         credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
         client = gspread.authorize(credentials)
         sheet = client.open("Eventi in Friuli").worksheet("TurismoFvg")
+        logging.info("Connessione a Google Sheets riuscita.")
     except Exception as e:
         logging.error(f"Errore accesso Google Sheets: {e}")
         return
@@ -155,6 +164,7 @@ def main():
         num_rows = len(sheet.get_all_values())
         if num_rows > 1:
             sheet.delete_rows(2, num_rows)
+            logging.info(f"Pulizia del foglio completata. Righe eliminate: {num_rows - 1}")
     except Exception as e:
         logging.error(f"Errore pulizia foglio: {e}")
 
@@ -171,22 +181,23 @@ def main():
             break
 
         soup = BeautifulSoup(r.content, 'html.parser')
-        eventi = estrai_eventi_completi(soup)
-
+        eventi = estrai_eventi(soup)
         if not eventi:
+            logging.info(f"Nessun evento trovato nella pagina {page}.")
             break
 
         eventi_totali.extend(eventi)
         time.sleep(2)
 
     if eventi_totali:
-        righe = [[e['titolo'], e['data'], e['luogo'], e['categoria'], e['link']] for e in eventi_totali]
+        righe = [[e['titolo'], e['data'], e['ora'], e['luogo'], e['link'], e['categoria']] for e in eventi_totali]
         try:
+            logging.info(f"Scrittura eventi su Google Sheets: {righe[:5]}")  # Logga le prime 5 righe
             sheet.append_rows(righe)
         except Exception as e:
             logging.error(f"Errore scrittura su Google Sheets: {e}")
     else:
         logging.info("Nessun evento da caricare.")
-
+    
 if __name__ == '__main__':
     main()
