@@ -1,7 +1,7 @@
 import os
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
+from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import time
@@ -10,10 +10,10 @@ import logging
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Mappa manuale dei nomi dei mesi in italiano
+# Mappa dei mesi in italiano
 mesi_italiani = {
-    "Jan": "Gen", "Feb": "Feb", "Mar": "Mar", "Apr": "Apr", "May": "Mag", "Jun": "Giu",
-    "Jul": "Lug", "Aug": "Ago", "Sep": "Set", "Oct": "Ott", "Nov": "Nov", "Dec": "Dic"
+    "Gennaio": "01", "Febbraio": "02", "Marzo": "03", "Aprile": "04", "Maggio": "05", "Giugno": "06",
+    "Luglio": "07", "Agosto": "08", "Settembre": "09", "Ottobre": "10", "Novembre": "11", "Dicembre": "12"
 }
 
 # URL di partenza
@@ -34,23 +34,35 @@ def estrai_eventi(soup):
             titolo = 'Titolo non disponibile'
             link = 'Link non disponibile'
 
-        # Estrazione della data
-        data_elem = evento.find('time', class_='tribe-events-calendar-list__event-date-tag-datetime')
-        if data_elem and data_elem.has_attr('datetime'):
-            data_raw = data_elem['datetime']
+        # Estrazione della data e orario dal tag <span class="tribe-event-date-start">
+        data_elem = evento.find('span', class_='tribe-event-date-start')
+        if data_elem:
+            data_raw = data_elem.text.strip()
+            logging.info(f"Data raw trovata: {data_raw}")  # Log per debug
+
+            # Split della data per ottenere il mese, giorno e orario
             try:
-                data = datetime.strptime(data_raw, '%Y-%m-%d')
-            except ValueError:
+                # Esempio: "Novembre 15 @ 17:00"
+                mese, giorno_orario = data_raw.split(" ", 1)
+                giorno, orario = giorno_orario.split(" @ ", 1)
+
+                # Ottieni il numero del mese dalla mappa
+                mese_numero = mesi_italiani.get(mese, None)
+                if mese_numero:
+                    # Crea la data nel formato desiderato
+                    data = datetime.strptime(f"{giorno} {mese_numero} {datetime.now().year} {orario}", "%d %m %Y %H:%M")
+                else:
+                    data = None
+            except Exception as e:
+                logging.warning(f"Errore nell'elaborazione della data: {data_raw} - {e}")
                 data = None
         else:
             data = None
 
-        # Estrazione dell'orario
-        orario_elem = evento.find('time', class_='tribe-events-calendar-list__event-datetime')
+        # Estrazione dell'orario (separato dall'elemento "orario")
         orario = 'Orario non disponibile'
-        if orario_elem:
-            orario_start_elem = orario_elem.find('span', class_='tribe-event-date-start')
-            orario = orario_start_elem.text.split('@')[-1].strip() if orario_start_elem else orario
+        if data_elem:
+            orario = orario.strip()  # Ho già estratto l'orario in precedenza con la logica di split
 
         # Estrazione del luogo
         luogo_elem = evento.find('address', class_='tribe-events-calendar-list__event-venue')
@@ -78,7 +90,6 @@ def estrai_eventi(soup):
         eventi.append(evento_data)
 
     return eventi
-
 
 def main():
     try:
@@ -122,7 +133,7 @@ def main():
 
     eventi_totali = []
     url_da_scrapare = url
-    data_limite = datetime.now() + timedelta(days=7)
+    data_limite = datetime.now()
 
     while url_da_scrapare:
         logging.info(f"Scraping URL: {url_da_scrapare}")
@@ -142,16 +153,10 @@ def main():
             break
 
         for evento in eventi_pagina:
-            if evento['data'] and evento['data'] > data_limite:
-                logging.info(f"Data limite raggiunta: {evento['data']}")
-                url_da_scrapare = None
-                break
-
             eventi_totali.append(evento)
 
-        if url_da_scrapare:
-            next_page_elem = soup.find('a', class_='tribe-events-c-nav__next')
-            url_da_scrapare = next_page_elem['href'] if next_page_elem and next_page_elem.has_attr('href') else None
+        next_page_elem = soup.find('a', class_='tribe-events-c-nav__next')
+        url_da_scrapare = next_page_elem['href'] if next_page_elem and next_page_elem.has_attr('href') else None
         time.sleep(2)
 
     if eventi_totali:
@@ -162,11 +167,12 @@ def main():
         righe = [
             [
                 e['titolo'],
-                f"{e['data'].day:02d} {mesi_italiani[e['data'].strftime('%b')]} {e['data'].year}" if e['data'] else "Data non disponibile",
+                f"{e['data'].day:02d} {mesi_italiani[e['data'].strftime('%B')]} {e['data'].year}" if e['data'] else "Data non disponibile",
                 e['orario'],
                 e['luogo'],
                 e['link'],
-                e['categoria']
+                e['categoria'],
+                e['descrizione']
             ]
             for e in eventi_totali
         ]
