@@ -10,7 +10,7 @@ import logging
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Mappa manuale dei nomi dei mesi in italiano
+# Mappa manuale dei mesi in italiano
 mesi_italiani = {
     "Jan": "Gen", "Feb": "Feb", "Mar": "Mar", "Apr": "Apr", "May": "Mag", "Jun": "Giu",
     "Jul": "Lug", "Aug": "Ago", "Sep": "Set", "Oct": "Ott", "Nov": "Nov", "Dec": "Dic"
@@ -36,12 +36,14 @@ def estrai_eventi(soup):
 
         # Estrazione della data
         data_elem = evento.find('time', class_='tribe-events-calendar-list__event-date-tag-datetime')
+        data = None
         if data_elem and data_elem.has_attr('datetime'):
             data_raw = data_elem['datetime']
             try:
+                # La data viene già estratta come ISO 8601 (YYYY-MM-DD)
                 data = datetime.strptime(data_raw, '%Y-%m-%d')
             except ValueError:
-                data = None
+                logging.warning(f"Formato data non valido per {data_raw}.")
         else:
             data = None
 
@@ -78,7 +80,6 @@ def estrai_eventi(soup):
         eventi.append(evento_data)
 
     return eventi
-
 
 def main():
     try:
