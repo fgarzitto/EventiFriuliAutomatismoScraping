@@ -10,7 +10,7 @@ import logging
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Mappa manuale dei mesi in italiano
+# Mappa manuale dei nomi dei mesi in italiano
 mesi_italiani = {
     "Jan": "Gen", "Feb": "Feb", "Mar": "Mar", "Apr": "Apr", "May": "Mag", "Jun": "Giu",
     "Jul": "Lug", "Aug": "Ago", "Sep": "Set", "Oct": "Ott", "Nov": "Nov", "Dec": "Dic"
@@ -35,24 +35,30 @@ def estrai_eventi(soup):
             link = 'Link non disponibile'
 
         # Estrazione della data
-        data_elem = evento.find('time', class_='tribe-events-calendar-list__event-date-tag-datetime')
         data = None
+        data_elem = evento.find('time', class_='tribe-events-calendar-list__event-datetime')
         if data_elem and data_elem.has_attr('datetime'):
             data_raw = data_elem['datetime']
             try:
-                # La data viene già estratta come ISO 8601 (YYYY-MM-DD)
+                # La data viene estratta dall'attributo datetime
                 data = datetime.strptime(data_raw, '%Y-%m-%d')
-            except ValueError:
-                logging.warning(f"Formato data non valido per {data_raw}.")
+                logging.info(f"Data trovata: {data}")
+            except ValueError as e:
+                logging.warning(f"Formato data non valido per {data_raw}: {e}")
         else:
-            data = None
+            logging.warning(f"Nessuna data trovata nel tag datetime per l'evento '{titolo}'")
 
-        # Estrazione dell'orario
-        orario_elem = evento.find('time', class_='tribe-events-calendar-list__event-datetime')
+        # Estrazione dell'orario di inizio
         orario = 'Orario non disponibile'
+        orario_elem = evento.find('span', class_='tribe-event-date-start')
         if orario_elem:
-            orario_start_elem = orario_elem.find('span', class_='tribe-event-date-start')
-            orario = orario_start_elem.text.split('@')[-1].strip() if orario_start_elem else orario
+            orario = orario_elem.text.split('@')[-1].strip()
+
+        # Estrazione dell'orario di fine
+        orario_fine = 'Orario non disponibile'
+        orario_fine_elem = evento.find('span', class_='tribe-event-time')
+        if orario_fine_elem:
+            orario_fine = orario_fine_elem.text.strip()
 
         # Estrazione del luogo
         luogo_elem = evento.find('address', class_='tribe-events-calendar-list__event-venue')
@@ -69,7 +75,7 @@ def estrai_eventi(soup):
         evento_data = {
             'titolo': titolo,
             'data': data,  # Oggetto datetime o None
-            'orario': orario,
+            'orario': f"{orario} - {orario_fine}",
             'luogo': luogo,
             'link': link,
             'categoria': 'Non specificata',  # Aggiungi qui la logica per la categoria se necessario
@@ -80,6 +86,7 @@ def estrai_eventi(soup):
         eventi.append(evento_data)
 
     return eventi
+
 
 def main():
     try:
