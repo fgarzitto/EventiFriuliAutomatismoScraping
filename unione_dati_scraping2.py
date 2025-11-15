@@ -112,11 +112,11 @@ def unisci_e_ordina_eventi():
             df = df.dropna(subset=['Data_parsed'])
             df = df.sort_values(by='Data_parsed')
 
-            # Ottieni la data odierna
-            oggi = datetime.today()
+            # Ottieni la data odierna, ma solo la parte della data (senza orario)
+            oggi = datetime.today().date()
 
-            # Filtra il DataFrame per escludere le date precedenti ad oggi
-            df = df[df['Data_parsed'] >= oggi]
+            # Filtra il DataFrame per escludere le date precedenti ad oggi, inclusa la data odierna
+            df = df[df['Data_parsed'].dt.date >= oggi]
 
             # Formatta la colonna Data
             df['Data'] = df['Data_parsed'].dt.strftime('%d %b %Y')
