@@ -23,7 +23,7 @@ def estrai_eventi(soup):
     eventi = []
 
     # Trova tutti gli eventi nella pagina
-    for evento in soup.find_all('div', class_='tribe-events-calendar-list__event-wrapper'):
+    for evento in soup.find_all('div', class_='tribe-events-calendar-list__event-row'):
         # Estrazione del titolo
         titolo_elem = evento.find('h3', class_='tribe-events-calendar-list__event-title')
         if titolo_elem:
@@ -34,26 +34,32 @@ def estrai_eventi(soup):
             titolo = 'Titolo non disponibile'
             link = 'Link non disponibile'
 
-        # Estrazione della data
+        # Estrazione della data come oggetto datetime
         data_elem = evento.find('time', class_='tribe-events-calendar-list__event-date-tag-datetime')
-        if data_elem:
-            # Estrazione del giorno della settimana e del giorno numerico
-            weekday_elem = data_elem.find('span', class_='tribe-events-calendar-list__event-date-tag-weekday')
-            daynum_elem = data_elem.find('span', class_='tribe-events-calendar-list__event-date-tag-daynum')
-            weekday = weekday_elem.text.strip() if weekday_elem else ''
-            daynum = daynum_elem.text.strip() if daynum_elem else ''
-            data = f"{weekday} {daynum}" if weekday and daynum else "Data non disponibile"
+        if data_elem and data_elem.has_attr('datetime'):
+            data_raw = data_elem['datetime']
+            try:
+                # Converti la data in oggetto datetime
+                data = datetime.strptime(data_raw, '%Y-%m-%d')
+            except ValueError:
+                data = None
         else:
-            data = "Data non disponibile"
+            # Fallback: prova a estrarre la data dai figli del tag <time>
+            try:
+                data_text = ''.join(data_elem.stripped_strings) if data_elem else ''
+                # Converti la data dal formato inglese
+                data = datetime.strptime(data_text, '%d %b %Y')
+                # Traduci il mese in italiano usando la mappa
+                mese_italiano = mesi_italiani[data.strftime('%b')]
+                data = data.strftime(f"%d {mese_italiano} %Y")
+            except (ValueError, AttributeError):
+                data = None  # Se non riesci a ottenere una data, impostala su None
 
-        # Estrazione dell'orario
+        # Estrazione dell'orario di inizio
         orario_elem = evento.find('time', class_='tribe-events-calendar-list__event-datetime')
         if orario_elem:
             orario_start_elem = orario_elem.find('span', class_='tribe-event-date-start')
-            orario_end_elem = orario_elem.find('span', class_='tribe-event-date-end')
-            orario_start = orario_start_elem.text if orario_start_elem else 'Orario non disponibile'
-            orario_end = orario_end_elem.text if orario_end_elem else 'Orario non disponibile'
-            orario = f"{orario_start} - {orario_end}"
+            orario = orario_start_elem.text.split('@')[-1].strip() if orario_start_elem else 'Orario non disponibile'
         else:
             orario = 'Orario non disponibile'
 
@@ -65,22 +71,22 @@ def estrai_eventi(soup):
         else:
             luogo = 'Luogo non disponibile'
 
-        # Estrazione della descrizione (opzionale)
-        descrizione_elem = evento.find('div', class_='tribe-events-calendar-list__event-description')
-        descrizione = descrizione_elem.text.strip() if descrizione_elem else 'Descrizione non disponibile'
-
         # Imposta la categoria predefinita se non specificata
         categoria = 'Non specificata'
+
+        # Estrazione della descrizione
+        descrizione = evento.find('div', class_='tribe-events-calendar-list__event-description')
+        descrizione_text = descrizione.text.strip() if descrizione else 'Descrizione non disponibile'
 
         # Crea il dizionario dell'evento
         evento_data = {
             'titolo': titolo,
-            'data': data,  # Data formattata
+            'data': data,  # Oggetto datetime o None
             'orario': orario,
             'luogo': luogo,
             'link': link,
             'categoria': categoria,
-            'descrizione': descrizione,
+            'descrizione': descrizione_text
         }
 
         logging.info(f"Evento trovato: {evento_data}")
@@ -150,7 +156,8 @@ def main():
             break
 
         for evento in eventi_pagina:
-            if evento['data'] and evento['data'] > data_limite:
+            # Controlla che la data sia valida e confronta con la data limite
+            if evento['data'] and isinstance(evento['data'], datetime) and evento['data'] > data_limite:
                 logging.info(f"Data limite raggiunta: {evento['data']}")
                 url_da_scrapare = None
                 break
@@ -170,7 +177,7 @@ def main():
         righe = [
             [
                 e['titolo'],
-                e['data'],
+                f"{e['data'].day:02d} {mesi_italiani[e['data'].strftime('%b')]} {e['data'].year}" if e['data'] else "Data non disponibile",
                 e['orario'],
                 e['luogo'],
                 e['link'],
