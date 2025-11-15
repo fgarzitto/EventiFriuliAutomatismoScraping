@@ -1,4 +1,4 @@
-name: Test Scraping Unionedati
+name: Test Scraping Unionedati2
 
 on:
   workflow_dispatch: # Permette di avviare manualmente il workflow
