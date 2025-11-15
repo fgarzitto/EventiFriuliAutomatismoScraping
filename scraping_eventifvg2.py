@@ -6,6 +6,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import time
 import logging
+import re  # Per il parsing migliorato delle date
 
 # Configura il logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -40,9 +41,12 @@ def estrai_eventi(soup):
             data_raw = data_elem.text.strip()
             logging.info(f"Data raw trovata: {data_raw}")  # Log per debug
 
+            # Rimuovi eventuali virgole dalla data
+            data_raw = re.sub(r',', '', data_raw)
+
             # Split della data per ottenere il mese, giorno e orario
             try:
-                # Esempio: "Novembre 15 @ 17:00"
+                # Esempio: "Novembre 23, 2026 @ 21:00" o "Settembre 4, 2026 @ 9:00"
                 mese, giorno_orario = data_raw.split(" ", 1)
                 giorno, orario = giorno_orario.split(" @ ", 1)
 
