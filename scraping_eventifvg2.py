@@ -23,7 +23,7 @@ def estrai_eventi(soup):
     eventi = []
 
     # Trova tutti gli eventi nella pagina
-    for evento in soup.find_all('div', class_='tribe-events-calendar-list__event-row'):
+    for evento in soup.find_all('div', class_='tribe-events-calendar-list__event-wrapper'):
         # Estrazione del titolo
         titolo_elem = evento.find('h3', class_='tribe-events-calendar-list__event-title')
         if titolo_elem:
@@ -34,65 +34,51 @@ def estrai_eventi(soup):
             titolo = 'Titolo non disponibile'
             link = 'Link non disponibile'
 
-        # Estrazione della data come oggetto datetime
+        # Estrazione della data
         data_elem = evento.find('time', class_='tribe-events-calendar-list__event-date-tag-datetime')
         if data_elem and data_elem.has_attr('datetime'):
             data_raw = data_elem['datetime']
             try:
-                # Converti la data in oggetto datetime
                 data = datetime.strptime(data_raw, '%Y-%m-%d')
             except ValueError:
                 data = None
         else:
-            # Fallback: prova a estrarre la data dai figli del tag <time>
-            try:
-                data_text = ''.join(data_elem.stripped_strings) if data_elem else ''
-                # Converti la data dal formato inglese
-                data = datetime.strptime(data_text, '%d %b %Y')
-                # Traduci il mese in italiano usando la mappa
-                mese_italiano = mesi_italiani[data.strftime('%b')]
-                data = data.strftime(f"%d {mese_italiano} %Y")
-            except (ValueError, AttributeError):
-                data = None  # Se non riesci a ottenere una data, impostala su None
+            data = None
 
-        # Estrazione dell'orario di inizio
+        # Estrazione dell'orario
         orario_elem = evento.find('time', class_='tribe-events-calendar-list__event-datetime')
+        orario = 'Orario non disponibile'
         if orario_elem:
             orario_start_elem = orario_elem.find('span', class_='tribe-event-date-start')
-            orario = orario_start_elem.text.split('@')[-1].strip() if orario_start_elem else 'Orario non disponibile'
-        else:
-            orario = 'Orario non disponibile'
+            orario = orario_start_elem.text.split('@')[-1].strip() if orario_start_elem else orario
 
         # Estrazione del luogo
         luogo_elem = evento.find('address', class_='tribe-events-calendar-list__event-venue')
+        luogo = 'Luogo non disponibile'
         if luogo_elem:
             luogo_title_elem = luogo_elem.find('span', class_='tribe-events-calendar-list__event-venue-title')
-            luogo = luogo_title_elem.text.strip() if luogo_title_elem else 'Luogo non disponibile'
-        else:
-            luogo = 'Luogo non disponibile'
-
-        # Imposta la categoria predefinita se non specificata
-        categoria = 'Non specificata'
+            luogo = luogo_title_elem.text.strip() if luogo_title_elem else luogo
 
         # Estrazione della descrizione
-        descrizione = evento.find('div', class_='tribe-events-calendar-list__event-description')
-        descrizione_text = descrizione.text.strip() if descrizione else 'Descrizione non disponibile'
+        descrizione_elem = evento.find('div', class_='tribe-events-calendar-list__event-description')
+        descrizione = descrizione_elem.text.strip() if descrizione_elem else 'Descrizione non disponibile'
 
-        # Crea il dizionario dell'evento
+        # Crea il dizionario per l'evento
         evento_data = {
             'titolo': titolo,
             'data': data,  # Oggetto datetime o None
             'orario': orario,
             'luogo': luogo,
             'link': link,
-            'categoria': categoria,
-            'descrizione': descrizione_text
+            'categoria': 'Non specificata',  # Aggiungi qui la logica per la categoria se necessario
+            'descrizione': descrizione
         }
 
         logging.info(f"Evento trovato: {evento_data}")
         eventi.append(evento_data)
 
     return eventi
+
 
 def main():
     try:
@@ -156,8 +142,7 @@ def main():
             break
 
         for evento in eventi_pagina:
-            # Controlla che la data sia valida e confronta con la data limite
-            if evento['data'] and isinstance(evento['data'], datetime) and evento['data'] > data_limite:
+            if evento['data'] and evento['data'] > data_limite:
                 logging.info(f"Data limite raggiunta: {evento['data']}")
                 url_da_scrapare = None
                 break
@@ -181,8 +166,7 @@ def main():
                 e['orario'],
                 e['luogo'],
                 e['link'],
-                e['categoria'],
-                e['descrizione']
+                e['categoria']
             ]
             for e in eventi_totali
         ]
