@@ -24,14 +24,13 @@ def estrai_eventi(soup):
 
     # Trova tutti gli eventi nella pagina
     for evento in soup.find_all('div', class_='tribe-events-calendar-list__event-wrapper'):
-      
         # Estrazione del titolo e del link
         titolo_elem = evento.find('h4', class_='tribe-events-calendar-list__event-title')
         if titolo_elem:
             link_elem = titolo_elem.find('a', class_='tribe-events-calendar-list__event-title-link')
             if link_elem and link_elem.has_attr('href'):
-            titolo = link_elem.text.strip()  # Estrai il testo del titolo
-            link = link_elem['href']  # Estrai il link dell'evento
+                titolo = link_elem.text.strip()  # Estrai il testo del titolo
+                link = link_elem['href']  # Estrai il link dell'evento
             else:
                 logging.warning(f"Link non trovato per l'evento '{titolo_elem.text.strip()}'")
                 titolo = 'Titolo non disponibile'
@@ -40,7 +39,6 @@ def estrai_eventi(soup):
             logging.warning("Titolo non trovato per l'evento")
             titolo = 'Titolo non disponibile'
             link = 'Link non disponibile'
-
 
         # Estrazione della data
         data = None
