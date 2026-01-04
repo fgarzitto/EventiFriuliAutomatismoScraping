@@ -75,14 +75,23 @@ def estrai_eventi(soup):
             luogo_meta = luogo_elem.find('meta', itemprop='name')
             if luogo_meta and 'content' in luogo_meta.attrs:
                 luogo_completo = luogo_meta['content'].strip()
+                logging.info(f"Luogo completo estratto: {luogo_completo}")  # Aggiungiamo un log per debug
+
                 # Estrazione del luogo abbreviato "Passariano di Codroipo (UD)"
                 # Supponiamo che il nome del luogo inizia da "Passariano di Codroipo"
-                luogo = luogo_completo.split(',')[0].strip()
-                # Aggiungiamo il codice della provincia (es. Udine)
+                if ',' in luogo_completo:
+                    luogo = luogo_completo.split(',')[0].strip()
+                    logging.info(f"Luogo estratto: {luogo}")  # Aggiungiamo un altro log per vedere cosa estraiamo
+
+                # Se ci sono parentesi per il codice provincia, lo estraiamo
                 if '(' in luogo_completo and ')' in luogo_completo:
                     luogo = luogo_completo.split('(')[0].strip() + " (" + luogo_completo.split('(')[1].split(')')[0] + ")"
-
-            logging.info(f"Luogo estratto: {luogo}")
+                    logging.info(f"Luogo dopo modifica: {luogo}")  # Log finale per vedere la versione finale del luogo
+            else:
+                logging.warning("Elemento meta con itemprop='name' non trovato per il luogo.")
+        
+        if luogo == 'Luogo non disponibile':
+            logging.warning("Luogo non trovato, il dato rimane non disponibile.")
         
     return eventi
 
