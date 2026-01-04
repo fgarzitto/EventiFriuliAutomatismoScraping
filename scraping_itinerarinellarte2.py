@@ -68,31 +68,23 @@ def estrai_eventi(soup):
         else:
             logging.warning("Periodo non disponibile per l'evento.")
 
-        # Estrazione del luogo dal nuovo codice
+        # Estrazione del luogo dal codice HTML
         luogo = 'Luogo non disponibile'
-        luogo_elem = evento.find('header', itemprop='location')
+        luogo_elem = evento.find('div', class_='eventi-date')
         if luogo_elem:
-            luogo_meta = luogo_elem.find('meta', itemprop='name')
-            if luogo_meta and 'content' in luogo_meta.attrs:
-                luogo_completo = luogo_meta['content'].strip()
-                logging.info(f"Luogo completo estratto: {luogo_completo}")  # Aggiungiamo un log per debug
-
-                # Estrazione del luogo abbreviato "Passariano di Codroipo (UD)"
-                # Supponiamo che il nome del luogo inizia da "Passariano di Codroipo"
-                if ',' in luogo_completo:
-                    luogo = luogo_completo.split(',')[0].strip()
-                    logging.info(f"Luogo estratto: {luogo}")  # Aggiungiamo un altro log per vedere cosa estraiamo
-
-                # Se ci sono parentesi per il codice provincia, lo estraiamo
-                if '(' in luogo_completo and ')' in luogo_completo:
-                    luogo = luogo_completo.split('(')[0].strip() + " (" + luogo_completo.split('(')[1].split(')')[0] + ")"
-                    logging.info(f"Luogo dopo modifica: {luogo}")  # Log finale per vedere la versione finale del luogo
+            # Estrai il testo e rimuovi gli spazi extra
+            luogo_text = luogo_elem.get_text(strip=True)
+            if luogo_text:
+                luogo = luogo_text
+                logging.info(f"Luogo estratto: {luogo}")
             else:
-                logging.warning("Elemento meta con itemprop='name' non trovato per il luogo.")
+                logging.warning("Testo del luogo vuoto o non trovato.")
+        else:
+            logging.warning("Elemento <div> con classe 'eventi-date' non trovato.")
         
         if luogo == 'Luogo non disponibile':
             logging.warning("Luogo non trovato, il dato rimane non disponibile.")
-        
+
     return eventi
 
 
