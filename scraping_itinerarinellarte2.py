@@ -24,34 +24,19 @@ def estrai_eventi(soup):
         7: "Lug", 8: "Ago", 9: "Set", 10: "Ott", 11: "Nov", 12: "Dic"
     }
 
+    # Trova tutti gli eventi
     for evento in soup.find_all('div', class_='col-date col-lg-6 col-sm-12 texts'):
-        # Trova il tag <a> che contiene <h4> con href all'evento
-        link = 'Link non disponibile'
+        # Estrazione del titolo
+        titolo_elem = evento.find('h3')
         titolo = 'Titolo non disponibile'
+        if titolo_elem:
+            titolo = titolo_elem.text.strip()
 
-        a_tag = evento.find(lambda tag: tag.name == "a" and tag.find("h4") and tag.has_attr("href"))
-        if a_tag:
-            h4_tag = a_tag.find("h4")
-            if h4_tag:
-                titolo = h4_tag.text.strip()
-                link = a_tag['href']
-                if link.startswith('/'):
-                    link = f"https://www.itinerarinellarte.it{link}"
-
-        luogo = 'Luogo non disponibile'
-        luogo_elem = evento.find('h3')
-        if luogo_elem:
-            link_luoghi = luogo_elem.find_all('a')
-            if len(link_luoghi) > 1:
-                luogo = link_luoghi[1].text.strip()
-                logging.info(f"Luogo estratto: {luogo}")
-            else:
-                logging.warning("Non ci sono abbastanza link per determinare il luogo.")
-        else:
-            logging.warning("Elemento <h3> non trovato per questo evento.")
-
+        # Estrazione della data di inizio e fine
         date_elems = evento.find_all('span', class_='eventi-data')
-        if date_elems and len(date_elems) >= 2:
+        data_inizio = 'Data non disponibile'
+        data_fine = 'Data non disponibile'
+        if len(date_elems) >= 2:
             data_inizio = date_elems[0].text.strip()
             data_fine = date_elems[1].text.strip().replace('-', '').strip()
             try:
@@ -68,8 +53,8 @@ def estrai_eventi(soup):
                         'data': data_formattata,
                         'data_sort': data_corrente,  # <-- Aggiunto campo per ordinare
                         'ora': 'Ora non disponibile',
-                        'luogo': luogo,
-                        'link': link,
+                        'luogo': 'Luogo non disponibile',
+                        'link': 'Link non disponibile',  # Placeholder per il link
                         'categoria': 'Mostre',
                     }
                     eventi.append(evento_data)
@@ -77,7 +62,22 @@ def estrai_eventi(soup):
                 logging.warning(f"Formato data non valido: {data_inizio} - {data_fine}")
         else:
             logging.warning("Periodo non disponibile per l'evento.")
+
+        # Estrazione del luogo
+        luogo_elem = evento.find('div', class_='eventi-date')
+        luogo = 'Luogo non disponibile'
+        if luogo_elem:
+            luogo = luogo_elem.text.strip().replace('Friuli Venezia Giulia, ', '')  # Puliamo il prefisso
+            logging.info(f"Luogo estratto: {luogo}")
+        
+        # Estrazione del link (da dedurre dal titolo o URL di base se necessario)
+        # Se c'è una struttura di link prevedibile (ad esempio, il link relativo a questo evento), aggiorna qui
+        link = 'Link non disponibile'  # Placeholder, poiché non è stato fornito un link esplicito
+        if 'Link' in link:  # Rimuovere questa riga dopo aver trovato la logica per generare il link
+            logging.info(f"Link trovato: {link}")
+
     return eventi
+
 
 def main():
     try:
