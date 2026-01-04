@@ -68,14 +68,20 @@ def estrai_eventi(soup):
         else:
             logging.warning("Periodo non disponibile per l'evento.")
 
-        # Estrazione del luogo
-        luogo_elem = evento.find('div', class_='eventi-date')
+        # Estrazione del luogo dal nuovo codice
         luogo = 'Luogo non disponibile'
+        luogo_elem = evento.find('header', itemprop='location')
         if luogo_elem:
-            luogo_text = luogo_elem.text.strip()
-            # Rimuovi il prefisso "Friuli Venezia Giulia, " per ottenere solo la città
-            if 'Friuli Venezia Giulia, ' in luogo_text:
-                luogo = luogo_text.replace('Friuli Venezia Giulia, ', '')
+            luogo_meta = luogo_elem.find('meta', itemprop='name')
+            if luogo_meta and 'content' in luogo_meta.attrs:
+                luogo_completo = luogo_meta['content'].strip()
+                # Estrazione del luogo abbreviato "Passariano di Codroipo (UD)"
+                # Supponiamo che il nome del luogo inizia da "Passariano di Codroipo"
+                luogo = luogo_completo.split(',')[0].strip()
+                # Aggiungiamo il codice della provincia (es. Udine)
+                if '(' in luogo_completo and ')' in luogo_completo:
+                    luogo = luogo_completo.split('(')[0].strip() + " (" + luogo_completo.split('(')[1].split(')')[0] + ")"
+
             logging.info(f"Luogo estratto: {luogo}")
         
     return eventi
