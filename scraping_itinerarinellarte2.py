@@ -72,8 +72,10 @@ def estrai_eventi(soup):
         luogo_elem = evento.find('div', class_='eventi-date')
         luogo = 'Luogo non disponibile'
         if luogo_elem:
-            # Estrazione del testo del luogo, rimuovendo il prefisso "Friuli Venezia Giulia, "
-            luogo = luogo_elem.text.strip().replace('Friuli Venezia Giulia, ', '')  # Puliamo il prefisso
+            luogo_text = luogo_elem.text.strip()
+            # Rimuovi il prefisso "Friuli Venezia Giulia, " per ottenere solo la città
+            if 'Friuli Venezia Giulia, ' in luogo_text:
+                luogo = luogo_text.replace('Friuli Venezia Giulia, ', '')
             logging.info(f"Luogo estratto: {luogo}")
         
     return eventi
