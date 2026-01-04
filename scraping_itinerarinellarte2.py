@@ -25,12 +25,17 @@ def estrai_eventi(soup):
     }
 
     # Trova tutti gli eventi
-    for evento in soup.find_all('div', class_='col-date col-lg-6 col-sm-12 texts'):
+    for evento in soup.find_all('a', class_='row-tile'):
         # Estrazione del titolo
         titolo_elem = evento.find('h3')
         titolo = 'Titolo non disponibile'
         if titolo_elem:
             titolo = titolo_elem.text.strip()
+
+        # Estrazione del link
+        link = evento['href'] if evento.has_attr('href') else 'Link non disponibile'
+        if link.startswith('/'):  # Se il link è relativo, creiamo il link assoluto
+            link = f"https://www.itinerarinellarte.it{link}"
 
         # Estrazione della data di inizio e fine
         date_elems = evento.find_all('span', class_='eventi-data')
@@ -54,7 +59,7 @@ def estrai_eventi(soup):
                         'data_sort': data_corrente,  # <-- Aggiunto campo per ordinare
                         'ora': 'Ora non disponibile',
                         'luogo': 'Luogo non disponibile',
-                        'link': 'Link non disponibile',  # Placeholder per il link
+                        'link': link,
                         'categoria': 'Mostre',
                     }
                     eventi.append(evento_data)
@@ -67,15 +72,10 @@ def estrai_eventi(soup):
         luogo_elem = evento.find('div', class_='eventi-date')
         luogo = 'Luogo non disponibile'
         if luogo_elem:
+            # Estrazione del testo del luogo, rimuovendo il prefisso "Friuli Venezia Giulia, "
             luogo = luogo_elem.text.strip().replace('Friuli Venezia Giulia, ', '')  # Puliamo il prefisso
             logging.info(f"Luogo estratto: {luogo}")
         
-        # Estrazione del link (da dedurre dal titolo o URL di base se necessario)
-        # Se c'è una struttura di link prevedibile (ad esempio, il link relativo a questo evento), aggiorna qui
-        link = 'Link non disponibile'  # Placeholder, poiché non è stato fornito un link esplicito
-        if 'Link' in link:  # Rimuovere questa riga dopo aver trovato la logica per generare il link
-            logging.info(f"Link trovato: {link}")
-
     return eventi
 
 
