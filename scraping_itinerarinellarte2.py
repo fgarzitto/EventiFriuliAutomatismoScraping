@@ -132,14 +132,19 @@ def main():
         logging.error(f"Errore Google Sheets: {e}")
         return
 
-    # -------- PULIZIA FOGLIO --------
+    # -------- PULIZIA FOGLIO (ROBUSTA) --------
     try:
-        sheet.batch_clear(["A2:F10000"])
+        rows = sheet.row_count
+        if rows > 1:
+            sheet.delete_rows(2, rows)
+            logging.info("Righe precedenti eliminate")
+        else:
+            logging.info("Nessuna riga da eliminare")
     except Exception as e:
         logging.error(f"Errore pulizia foglio: {e}")
         return
 
-    # -------- SCRAPING PAGINE --------
+    # -------- SCRAPING --------
     eventi_totali = []
 
     for page in range(MAX_PAGES + 1):
