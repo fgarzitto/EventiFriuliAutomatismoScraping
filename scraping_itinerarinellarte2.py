@@ -1,12 +1,12 @@
 import os
+import time
+import re
+import logging
 import cloudscraper
+import gspread
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
-import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import time
-import logging
-import re
 
 # ================= CONFIG =================
 URL_BASE = "https://www.itinerarinellarte.it"
@@ -39,29 +39,24 @@ def estrai_eventi(soup):
     oggi = datetime.now()
     limite = oggi + timedelta(days=GIORNI_AVANTI)
 
-    # 🔥 Selettore robusto
-    cards = soup.select('a[href*="/it/mostre/"]')
+    cards = soup.select("div.col-date")
+
     logging.info(f"Eventi trovati nella pagina: {len(cards)}")
 
     for card in cards:
         # ----- titolo -----
-        titolo_elem = card.find("h3") or card.find("h4")
+        titolo_elem = card.find("h3")
         if not titolo_elem:
             continue
         titolo = titolo_elem.get_text(strip=True)
 
         # ----- link -----
-        link = card.get("href")
+        link_elem = titolo_elem.find_parent("a")
+        if not link_elem:
+            continue
+        link = link_elem.get("href")
         if link.startswith("/"):
             link = f"{URL_BASE}{link}"
-
-        # ----- luogo -----
-        luogo = "Luogo non disponibile"
-        luogo_elem = card.find_next("div", class_="eventi-date")
-        if luogo_elem:
-            luogo_text = luogo_elem.get_text(strip=True)
-            # Evitiamo di prendere icone o date
-            luogo = re.sub(r'[^A-Za-z0-9À-ÿ ,.-]', '', luogo_text)
 
         # ----- date -----
         date_spans = card.find_all("span", class_="eventi-data")
@@ -75,6 +70,12 @@ def estrai_eventi(soup):
 
         data_inizio = max(data_inizio, oggi)
         data_fine = min(data_fine, limite)
+
+        # ----- luogo -----
+        luogo = "Luogo non disponibile"
+        luogo_divs = card.find_all("div", class_="eventi-date")
+        if len(luogo_divs) >= 2:
+            luogo = luogo_divs[1].get_text(strip=True)
 
         # ----- espandi giorni -----
         for i in range((data_fine - data_inizio).days + 1):
@@ -125,7 +126,7 @@ def main():
     if sheet.row_count > 1:
         sheet.delete_rows(2, sheet.row_count)
 
-    # ----- Scraping con cloudscraper -----
+    # ----- Scraping -----
     scraper = cloudscraper.create_scraper()
     eventi_totali = []
 
@@ -137,11 +138,12 @@ def main():
             r = scraper.get(url, timeout=15)
             r.raise_for_status()
         except Exception as e:
-            logging.error(f"Errore nella richiesta: {e}")
+            logging.error(f"Errore richiesta pagina {page}: {e}")
             continue
 
         soup = BeautifulSoup(r.text, "html.parser")
         eventi = estrai_eventi(soup)
+
         if not eventi:
             logging.info("Nessun evento trovato in questa pagina")
             break
@@ -151,10 +153,11 @@ def main():
 
     # ----- Scrittura su Google Sheets -----
     if not eventi_totali:
-        logging.info("Nessun evento trovato")
+        logging.info("Nessun evento da caricare")
         return
 
     eventi_totali.sort(key=lambda e: e["data_sort"])
+
     righe = [
         [e["titolo"], e["data"], e["ora"], e["luogo"], e["link"], e["categoria"]]
         for e in eventi_totali
