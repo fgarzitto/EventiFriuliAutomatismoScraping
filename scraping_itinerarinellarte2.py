@@ -8,13 +8,16 @@ import time
 import logging
 import re
 
-# ---------------- CONFIG ----------------
+# ================= CONFIG =================
 URL_BASE = "https://www.itinerarinellarte.it"
 URL_EVENTI = f"{URL_BASE}/it/mostre/friuli-venezia-giulia"
 
 GIORNI_AVANTI = 7
 MAX_PAGES = 4
 SLEEP_TIME = 2
+
+SHEET_NAME = "Eventi in Friuli"
+WORKSHEET_NAME = "Itinerarinellarte"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -23,9 +26,11 @@ MESI = {
     7: "Lug", 8: "Ago", 9: "Set", 10: "Ott", 11: "Nov", 12: "Dic"
 }
 
-# ---------------- UTILS ----------------
+# ================= UTILS =================
 def parse_data(data_str):
-    """Estrae una data nel formato dd/mm/yyyy se presente"""
+    """Estrae una data dd/mm/yyyy se presente"""
+    if not data_str:
+        return None
     match = re.search(r"\d{2}/\d{2}/\d{4}", data_str)
     if not match:
         return None
@@ -34,8 +39,7 @@ def parse_data(data_str):
     except ValueError:
         return None
 
-
-# ---------------- SCRAPING ----------------
+# ================= SCRAPING =================
 def estrai_eventi(soup):
     eventi = []
 
@@ -43,23 +47,25 @@ def estrai_eventi(soup):
     limite = oggi + timedelta(days=GIORNI_AVANTI)
 
     for evento in soup.select("a.row-tile"):
-        # ---- titolo ----
+        # -------- TITOLO --------
         titolo_elem = evento.find("h3")
         titolo = titolo_elem.get_text(strip=True) if titolo_elem else "Titolo non disponibile"
 
-        # ---- link ----
+        # -------- LINK --------
         link = evento.get("href", "")
         if link.startswith("/"):
             link = f"{URL_BASE}{link}"
 
-        # ---- luogo ----
+        # -------- LUOGO --------
         luogo = "Luogo non disponibile"
-        luogo_elem = evento.select_one("span.eventi-luogo") \
-                     or evento.select_one("div.eventi-date span")
+        luogo_elem = (
+            evento.select_one("span.eventi-luogo")
+            or evento.select_one("div.eventi-date span")
+        )
         if luogo_elem:
             luogo = luogo_elem.get_text(strip=True)
 
-        # ---- date ----
+        # -------- DATE --------
         date_elems = evento.select("span.eventi-data")
         if len(date_elems) < 2:
             logging.warning(f"Date mancanti per evento: {titolo}")
@@ -75,9 +81,8 @@ def estrai_eventi(soup):
         data_inizio = max(data_inizio, oggi)
         data_fine = min(data_fine, limite)
 
-        # ---- crea eventi per ogni giorno ----
-        delta = (data_fine - data_inizio).days
-        for i in range(delta + 1):
+        # -------- ESPANSIONE GIORNI --------
+        for i in range((data_fine - data_inizio).days + 1):
             giorno = data_inizio + timedelta(days=i)
             eventi.append({
                 "titolo": titolo,
@@ -91,17 +96,24 @@ def estrai_eventi(soup):
 
     return eventi
 
-
-# ---------------- MAIN ----------------
+# ================= MAIN =================
 def main():
-    # ---- Google Sheets ----
+    # -------- GOOGLE SHEETS AUTH --------
     try:
         credentials_info = {
             "type": "service_account",
             "project_id": "EventiFriuli",
+            "private_key_id": os.getenv("GSHEET_PRIVATE_KEY_ID"),
             "private_key": os.getenv("GSHEET_PRIVATE_KEY").replace("\\n", "\n"),
             "client_email": os.getenv("GSHEET_CLIENT_EMAIL"),
-            "token_uri": "https://oauth2.googleapis.com/token"
+            "client_id": os.getenv("GSHEET_CLIENT_ID"),
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": (
+                "https://www.googleapis.com/robot/v1/metadata/x509/"
+                + os.getenv("GSHEET_CLIENT_EMAIL")
+            )
         }
 
         scope = [
@@ -109,19 +121,25 @@ def main():
             "https://www.googleapis.com/auth/drive"
         ]
 
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(
+            credentials_info, scope
+        )
         client = gspread.authorize(credentials)
-        sheet = client.open("Eventi in Friuli").worksheet("Itinerarinellarte")
+        sheet = client.open(SHEET_NAME).worksheet(WORKSHEET_NAME)
 
-        logging.info("Google Sheets connesso")
+        logging.info("Accesso a Google Sheets riuscito")
     except Exception as e:
         logging.error(f"Errore Google Sheets: {e}")
         return
 
-    # ---- pulizia foglio ----
-    sheet.batch_clear(["A2:F10000"])
+    # -------- PULIZIA FOGLIO --------
+    try:
+        sheet.batch_clear(["A2:F10000"])
+    except Exception as e:
+        logging.error(f"Errore pulizia foglio: {e}")
+        return
 
-    # ---- scraping ----
+    # -------- SCRAPING PAGINE --------
     eventi_totali = []
 
     for page in range(MAX_PAGES + 1):
@@ -129,10 +147,14 @@ def main():
         logging.info(f"Scraping pagina {page}")
 
         try:
-            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+            r = requests.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=15
+            )
             r.raise_for_status()
         except requests.RequestException as e:
-            logging.error(e)
+            logging.error(f"Errore richiesta pagina {page}: {e}")
             break
 
         soup = BeautifulSoup(r.text, "html.parser")
@@ -143,20 +165,21 @@ def main():
         eventi_totali.extend(eventi)
         time.sleep(SLEEP_TIME)
 
-    # ---- upload ----
+    # -------- UPLOAD --------
     if not eventi_totali:
         logging.info("Nessun evento trovato")
         return
 
     eventi_totali.sort(key=lambda e: e["data_sort"])
+
     righe = [
         [e["titolo"], e["data"], e["ora"], e["luogo"], e["link"], e["categoria"]]
         for e in eventi_totali
     ]
 
     sheet.append_rows(righe)
-    logging.info(f"{len(righe)} eventi caricati")
+    logging.info(f"{len(righe)} eventi caricati su Google Sheets")
 
-
+# ================= START =================
 if __name__ == "__main__":
     main()
