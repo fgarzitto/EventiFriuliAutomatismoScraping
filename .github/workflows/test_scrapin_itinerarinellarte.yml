@@ -34,4 +34,4 @@ jobs:
           GSHEET_PRIVATE_KEY_ID: ${{ secrets.GSHEET_PRIVATE_KEY_ID }}
           GSHEET_CLIENT_ID: ${{ secrets.GSHEET_CLIENT_ID }}
         run: |
-          python scraping_itinerarinellarte2.py
+          python scraping_itinerarinellarte.py
