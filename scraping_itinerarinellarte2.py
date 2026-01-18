@@ -1,5 +1,5 @@
 import os
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import gspread
@@ -39,39 +39,44 @@ def estrai_eventi(soup):
     oggi = datetime.now()
     limite = oggi + timedelta(days=GIORNI_AVANTI)
 
-    # 🔥 SELETTORE ROBUSTO
-    cards = soup.select('a[href^="/it/mostra/"]')
+    # 🔥 Selettore robusto
+    cards = soup.select('a[href*="/it/mostre/"]')
     logging.info(f"Eventi trovati nella pagina: {len(cards)}")
 
     for card in cards:
         # ----- titolo -----
-        titolo_elem = card.find("h4")
+        titolo_elem = card.find("h3") or card.find("h4")
         if not titolo_elem:
             continue
         titolo = titolo_elem.get_text(strip=True)
 
         # ----- link -----
-        link = f"{URL_BASE}{card.get('href')}"
+        link = card.get("href")
+        if link.startswith("/"):
+            link = f"{URL_BASE}{link}"
 
         # ----- luogo -----
         luogo = "Luogo non disponibile"
-        luogo_elem = card.find("span", class_=re.compile("luogo"))
+        luogo_elem = card.find_next("div", class_="eventi-date")
         if luogo_elem:
-            luogo = luogo_elem.get_text(strip=True)
+            luogo_text = luogo_elem.get_text(strip=True)
+            # Evitiamo di prendere icone o date
+            luogo = re.sub(r'[^A-Za-z0-9À-ÿ ,.-]', '', luogo_text)
 
         # ----- date -----
-        spans = card.find_all("span")
-        dates = [parse_data(s.get_text()) for s in spans]
-        dates = [d for d in dates if d]
-
-        if len(dates) < 2:
+        date_spans = card.find_all("span", class_="eventi-data")
+        if len(date_spans) < 2:
             continue
 
-        data_inizio, data_fine = dates[0], dates[1]
+        data_inizio = parse_data(date_spans[0].get_text(strip=True))
+        data_fine = parse_data(date_spans[1].get_text(strip=True))
+        if not data_inizio or not data_fine:
+            continue
 
         data_inizio = max(data_inizio, oggi)
         data_fine = min(data_fine, limite)
 
+        # ----- espandi giorni -----
         for i in range((data_fine - data_inizio).days + 1):
             giorno = data_inizio + timedelta(days=i)
             eventi.append({
@@ -88,6 +93,7 @@ def estrai_eventi(soup):
 
 # ================= MAIN =================
 def main():
+    # ----- Google Sheets -----
     credentials_info = {
         "type": "service_account",
         "project_id": "EventiFriuli",
@@ -115,38 +121,48 @@ def main():
 
     logging.info("Accesso a Google Sheets riuscito")
 
+    # ----- Pulizia foglio -----
     if sheet.row_count > 1:
         sheet.delete_rows(2, sheet.row_count)
 
+    # ----- Scraping con cloudscraper -----
+    scraper = cloudscraper.create_scraper()
     eventi_totali = []
 
     for page in range(MAX_PAGES + 1):
         url = URL_EVENTI if page == 0 else f"{URL_EVENTI}?page={page}"
         logging.info(f"Scraping pagina {page}")
 
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        soup = BeautifulSoup(r.text, "html.parser")
+        try:
+            r = scraper.get(url, timeout=15)
+            r.raise_for_status()
+        except Exception as e:
+            logging.error(f"Errore nella richiesta: {e}")
+            continue
 
+        soup = BeautifulSoup(r.text, "html.parser")
         eventi = estrai_eventi(soup)
         if not eventi:
+            logging.info("Nessun evento trovato in questa pagina")
             break
 
         eventi_totali.extend(eventi)
         time.sleep(SLEEP_TIME)
 
+    # ----- Scrittura su Google Sheets -----
     if not eventi_totali:
         logging.info("Nessun evento trovato")
         return
 
     eventi_totali.sort(key=lambda e: e["data_sort"])
-
     righe = [
         [e["titolo"], e["data"], e["ora"], e["luogo"], e["link"], e["categoria"]]
         for e in eventi_totali
     ]
 
     sheet.append_rows(righe)
-    logging.info(f"{len(righe)} eventi caricati")
+    logging.info(f"{len(righe)} eventi caricati su Google Sheets")
 
+# ================= START =================
 if __name__ == "__main__":
     main()
