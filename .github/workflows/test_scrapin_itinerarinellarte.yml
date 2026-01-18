@@ -2,34 +2,36 @@ name: Test Scraping Itinerarinellarte
 
 on:
   schedule:
-    - cron: '0 9 * * 1' # Esegui ogni lunedì alle 09:00 UTC
-  workflow_dispatch: # Permette di eseguire manualmente il workflow
+    - cron: '0 9 * * 1' # ogni lunedì alle 09:00 UTC
+  workflow_dispatch:     # permette esecuzione manuale
 
 jobs:
   run-scraping:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout del repository
+      # 1️⃣ Checkout del repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Configura Python
+      # 2️⃣ Setup Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.9  # Puoi specificare un'altra versione se necessario
+          python-version: '3.12'
 
-      # Installa le dipendenze
+      # 3️⃣ Installa le dipendenze
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install cloudscraper gspread oauth2client beautifulsoup4
 
-      # Esegui lo script di scraping
-      - name: Run scraping_itinerarinellarte.py
+      # 4️⃣ Esegui lo script di scraping
+      - name: Run scraping_itinerarinellarte2.py
         env:
           GSHEET_CLIENT_EMAIL: ${{ secrets.GSHEET_CLIENT_EMAIL }}
           GSHEET_PRIVATE_KEY: ${{ secrets.GSHEET_PRIVATE_KEY }}
+          GSHEET_PRIVATE_KEY_ID: ${{ secrets.GSHEET_PRIVATE_KEY_ID }}
+          GSHEET_CLIENT_ID: ${{ secrets.GSHEET_CLIENT_ID }}
         run: |
           python scraping_itinerarinellarte2.py
