@@ -39,35 +39,35 @@ def estrai_eventi(soup):
     oggi = datetime.now()
     limite = oggi + timedelta(days=GIORNI_AVANTI)
 
-    cards = soup.select("a.row.tile")
+    # 🔥 SELETTORE ROBUSTO
+    cards = soup.select('a[href^="/it/mostra/"]')
     logging.info(f"Eventi trovati nella pagina: {len(cards)}")
 
     for card in cards:
         # ----- titolo -----
         titolo_elem = card.find("h4")
-        titolo = titolo_elem.get_text(strip=True) if titolo_elem else "Titolo non disponibile"
+        if not titolo_elem:
+            continue
+        titolo = titolo_elem.get_text(strip=True)
 
         # ----- link -----
-        link = card.get("href", "")
-        if link.startswith("/"):
-            link = f"{URL_BASE}{link}"
+        link = f"{URL_BASE}{card.get('href')}"
 
         # ----- luogo -----
         luogo = "Luogo non disponibile"
-        luogo_elem = card.select_one("span.eventi-luogo")
+        luogo_elem = card.find("span", class_=re.compile("luogo"))
         if luogo_elem:
             luogo = luogo_elem.get_text(strip=True)
 
         # ----- date -----
-        date_elem = card.select("span.eventi-date")
-        if len(date_elem) < 2:
+        spans = card.find_all("span")
+        dates = [parse_data(s.get_text()) for s in spans]
+        dates = [d for d in dates if d]
+
+        if len(dates) < 2:
             continue
 
-        data_inizio = parse_data(date_elem[0].get_text())
-        data_fine = parse_data(date_elem[1].get_text())
-
-        if not data_inizio or not data_fine:
-            continue
+        data_inizio, data_fine = dates[0], dates[1]
 
         data_inizio = max(data_inizio, oggi)
         data_fine = min(data_fine, limite)
@@ -88,7 +88,6 @@ def estrai_eventi(soup):
 
 # ================= MAIN =================
 def main():
-    # ----- GOOGLE AUTH -----
     credentials_info = {
         "type": "service_account",
         "project_id": "EventiFriuli",
@@ -116,11 +115,9 @@ def main():
 
     logging.info("Accesso a Google Sheets riuscito")
 
-    # ----- PULIZIA FOGLIO -----
     if sheet.row_count > 1:
         sheet.delete_rows(2, sheet.row_count)
 
-    # ----- SCRAPING -----
     eventi_totali = []
 
     for page in range(MAX_PAGES + 1):
