@@ -4,6 +4,4 @@ requests
 gspread
 oauth2client
 dateparser
-
-
-
+cloudscraper
